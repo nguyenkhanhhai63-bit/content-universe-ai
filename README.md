@@ -1,47 +1,40 @@
-# Content Universe V6 – Siêu Di Động
+# Content Universe V7 – Siêu Di Động
 
-Bản V6 dùng Next.js, OpenAI API và Supabase.
+Phiên bản V7 đã được viết lại giao diện và nâng cấp Prompt Engine cho Gemini.
 
-## Có sẵn
+## Nâng cấp chính
 
-- Dashboard.
-- Tạo bản nháp miễn phí.
-- AI Writer.
-- AI Editor.
-- AI Analyst.
-- AI tạo 20 hook.
-- Kho Hook, Công thức, Kịch bản.
-- Trạng thái đã đăng/chưa đăng.
-- Content Universe.
-- Thiết lập giọng viết.
-- LocalStorage dự phòng.
-- Lưu kịch bản lên Supabase khi đã cấu hình.
-- Trang đăng nhập magic-link tại `/login`.
+- Giao diện mới hiện đại, responsive và có Dark Mode.
+- AI Writer dạng một ô mô tả, không còn ghép nhiều trường máy móc.
+- Tạo 1, 3 hoặc 5 phiên bản kịch bản.
+- AI Review chấm Hook, Logic, Twist, Cảm xúc và Giữ chân.
+- Hook Library dạng card, có yêu thích, tìm kiếm và chỉnh sửa.
+- Formula Library có mô tả và cấu trúc kể chuyện.
+- Script Library có tìm kiếm, yêu thích, trạng thái, sao chép và chỉnh sửa.
+- Content Universe dạng bản đồ ý tưởng.
+- Analytics cơ bản.
+- Import/Export dữ liệu JSON.
+- Gemini tự thử model dự phòng khi model cấu hình không còn dùng được.
 
-## Cập nhật GitHub/Vercel
-
-Thay toàn bộ mã trong repository hiện tại bằng các file trong ZIP này rồi Commit. Vercel nhận diện Next.js và tự deploy.
-
-## Environment Variables trên Vercel
+## Biến môi trường Vercel
 
 ```env
-OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-5-mini
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+GEMINI_API_KEY=API_KEY_CUA_BAN
+GEMINI_MODEL=gemini-3.5-flash-lite
 ```
 
-Chỉ hai biến OpenAI là bắt buộc cho AI. Không có Supabase thì ứng dụng vẫn chạy và lưu ở trình duyệt.
+`GEMINI_MODEL` có thể bỏ trống. Backend sẽ tự thử model dự phòng.
 
-## Thiết lập Supabase
+Dữ liệu được lưu trực tiếp trong trình duyệt bằng localStorage và có thể xuất/nhập bằng file JSON.
 
-1. Tạo project tại Supabase.
-2. Mở SQL Editor.
-3. Chạy file `supabase/schema.sql`.
-4. Vào Project Settings → API.
-5. Sao chép Project URL vào `NEXT_PUBLIC_SUPABASE_URL`.
-6. Sao chép anon public key vào `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
-7. Trong Authentication → URL Configuration, thêm URL Vercel của bạn vào Site URL và Redirect URLs.
-8. Redeploy Vercel.
+## Cách cập nhật GitHub
 
-Supabase khuyến nghị dùng client SSR/cookie cho App Router khi xây auth đầy đủ; bản này đã dùng `@supabase/ssr` ở browser client và có thể mở rộng middleware sau. 
+Cách an toàn nhất:
+
+1. Giải nén file ZIP.
+2. Mở repository `content-universe-ai`.
+3. Upload toàn bộ file và thư mục trong ZIP, chọn ghi đè file cũ.
+4. Commit thay đổi.
+5. Vercel tự deploy lại.
+
+Không đưa API key vào GitHub.

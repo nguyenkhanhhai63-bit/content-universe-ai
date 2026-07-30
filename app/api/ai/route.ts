@@ -1,82 +1,81 @@
 import { NextResponse } from "next/server";
 
-type GeminiPart = {
-  text?: string;
+type ScoreSet = {
+  hook: number;
+  logic: number;
+  twist: number;
+  emotion: number;
+  retention: number;
 };
 
-type GeminiResponse = {
-  candidates?: Array<{
-    content?: {
-      parts?: GeminiPart[];
-    };
-  }>;
-  promptFeedback?: {
-    blockReason?: string;
-  };
-  error?: {
-    code?: number;
-    message?: string;
-    status?: string;
-  };
-};
-
-function buildTask(body: any): string {
-  const info = body?.info || {};
-
-  if (body?.mode === "review") {
-    return `Phân tích kịch bản dưới đây theo các tiêu chí: Hook, Logic, Twist, Cảm xúc, Nhịp kể và khả năng giữ chân.
-Chỉ ra lỗi cụ thể, giải thích ngắn gọn và đề xuất cách sửa thực tế.
-Sau phần phân tích, viết thêm một phiên bản đã chỉnh sửa hoàn chỉnh.
-
-KỊCH BẢN:
-${body?.input || ""}`;
-  }
-
-  if (body?.mode === "rewrite") {
-    return `Viết lại kịch bản dưới đây thành một bản TikTok Voice Over hoàn chỉnh.
-Giữ đúng ý chính nhưng sửa toàn bộ đoạn ghép máy móc, chi tiết vô lý, câu chữ cứng và twist thiếu tự nhiên.
-Kịch bản phải giống người thật đang kể chuyện, có Hook → Mâu thuẫn → Diễn biến → Cao trào → Twist → Kết.
-
-KỊCH BẢN GỐC:
-${body?.input || ""}`;
-  }
-
-  if (body?.mode === "hooks") {
-    return `Viết 20 câu hook TikTok khác nhau dựa trên thông tin sau.
-Mỗi hook phải:
-- Có nhân vật rõ ràng.
-- Có bối cảnh hoặc lý do rõ ràng.
-- Có sự cố, mâu thuẫn hoặc câu nói gây chú ý.
-- Dễ hiểu ngay từ câu đầu.
-- Không lặp ý.
-- Chỉ đánh số từ 1 đến 20, không giải thích thêm.
-
-THÔNG TIN:
-${JSON.stringify(info, null, 2)}`;
-  }
-
-  return `Viết một kịch bản TikTok Voice Over hoàn chỉnh theo cấu trúc:
-Hook → Mâu thuẫn → Diễn biến → Cao trào → Twist → Kết.
-
-Yêu cầu:
-- Kể như một câu chuyện thật vừa xảy ra tại shop Siêu Di Động.
-- Câu đầu phải rõ ai đang làm gì, ở đâu và vì sao có chuyện.
-- Ngôn ngữ tự nhiên, bình dân, không viết kiểu MC.
-- Không quảng cáo lộ liễu, không review khô khan.
-- Không ghép máy móc các trường thông tin.
-- Mọi chi tiết phải liên kết logic với nhau.
-- Twist phải hợp lý với diễn biến trước đó.
-- Có thể dùng audio tag ElevenLabs V3 ở các đoạn phù hợp, nhưng hook không bắt buộc có tag.
-- Không dùng các từ: "chốt đơn", "siêu phẩm", "xuống tiền", "cấu hình khủng".
-
-THÔNG TIN KỊCH BẢN:
-${JSON.stringify(info, null, 2)}`;
+function cleanJson(text: string) {
+  return text.replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
 }
 
-export async function POST(req: Request) {
+function clampScore(value: unknown) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return 0;
+  return Math.max(0, Math.min(10, Math.round(number * 10) / 10));
+}
+
+async function generateWithModel(
+  model: string,
+  apiKey: string,
+  systemInstruction: string,
+  prompt: string,
+  jsonMode = false
+) {
+  const endpoint =
+    `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": apiKey,
+    },
+    body: JSON.stringify({
+      systemInstruction: {
+        parts: [{ text: systemInstruction }],
+      },
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }],
+        },
+      ],
+      generationConfig: {
+        temperature: jsonMode ? 0.45 : 0.92,
+        topP: 0.95,
+        maxOutputTokens: 7000,
+        ...(jsonMode ? { responseMimeType: "application/json" } : {}),
+      },
+    }),
+    cache: "no-store",
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    throw new Error(data?.error?.message || `Gemini lỗi ${response.status}.`);
+  }
+
+  const text =
+    data?.candidates?.[0]?.content?.parts
+      ?.map((part: { text?: string }) => part.text || "")
+      .join("")
+      .trim() || "";
+
+  if (!text) {
+    throw new Error("Gemini không trả về nội dung.");
+  }
+
+  return text;
+}
+
+export async function POST(request: Request) {
   try {
     const apiKey = process.env.GEMINI_API_KEY;
-
     if (!apiKey) {
       return NextResponse.json(
         { error: "Chưa cấu hình GEMINI_API_KEY trên Vercel." },
@@ -84,82 +83,184 @@ export async function POST(req: Request) {
       );
     }
 
-    const body = await req.json();
-    const task = buildTask(body);
+    const body = await request.json();
+    const mode = body?.mode || "create";
+    const style = body?.style || "";
+    const userPrompt = body?.prompt || body?.input || "";
+    const theme = body?.theme || "Tự do";
+    const versions = Math.max(1, Math.min(5, Number(body?.versions) || 1));
+    const formula = body?.formula || {};
+    const hookLibrary = Array.isArray(body?.hooks) ? body.hooks : [];
 
-    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
-    const endpoint =
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+    const systemInstruction = `${style}
 
-    const systemInstruction =
-      body?.style ||
-      `Bạn là biên tập viên TikTok chuyên viết nội dung cho Siêu Di Động.
-Viết tiếng Việt tự nhiên, logic, có cảm xúc, giống người thật kể chuyện.
-Ưu tiên câu chuyện khách hàng tại shop, không quảng cáo lộ liễu và không dùng văn phong AI.`;
+Bạn đang vận hành Content Universe V7.
+Mục tiêu là tạo nội dung có thể đọc thẳng bằng giọng Adam ElevenLabs V3.
+Không trình bày như bài phân tích trừ khi người dùng yêu cầu chấm điểm.
+Không thêm lời dẫn kiểu "Dưới đây là..." hoặc "Phiên bản của bạn...".
+Không dùng markdown heading trong kịch bản, trừ nhãn "PHIÊN BẢN A/B/C" khi tạo nhiều phiên bản.
+Không đánh số từng đoạn.
+Mỗi phiên bản phải là một câu chuyện hoàn chỉnh, tự nhiên và có logic nhân quả rõ ràng.`;
 
-    const geminiResponse = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: systemInstruction }],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: task }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.9,
-          topP: 0.95,
-          maxOutputTokens: body?.mode === "hooks" ? 3000 : 5000,
-        },
-      }),
-      cache: "no-store",
-    });
+    let prompt = "";
+    let jsonMode = false;
 
-    const data = (await geminiResponse.json()) as GeminiResponse;
+    if (mode === "review") {
+      jsonMode = true;
+      prompt = `Phân tích kịch bản sau theo đúng JSON schema bên dưới.
 
-    if (!geminiResponse.ok) {
-      const message =
-        data?.error?.message ||
-        `Gemini API trả về lỗi ${geminiResponse.status}.`;
+JSON bắt buộc:
+{
+  "scores": {
+    "hook": 0-10,
+    "logic": 0-10,
+    "twist": 0-10,
+    "emotion": 0-10,
+    "retention": 0-10
+  },
+  "analysis": "Phân tích chi tiết bằng tiếng Việt, có các phần: Điểm mạnh, Điểm yếu, Cách sửa, Bản viết lại gợi ý."
+}
 
-      return NextResponse.json(
-        { error: message },
-        { status: geminiResponse.status }
-      );
+Tiêu chí:
+- Hook có rõ nhân vật, bối cảnh và sự cố không.
+- Mạch kể có nguyên nhân và kết quả rõ không.
+- Twist có được dẫn dắt hay bị gượng ép.
+- Cảm xúc có tự nhiên, hợp giọng kể không.
+- Nhịp kể có giữ người xem tới cuối không.
+
+KỊCH BẢN:
+${body?.input || ""}`;
+    } else if (mode === "rewrite") {
+      prompt = `Viết lại kịch bản sau thành một bản TikTok Voice Over hoàn chỉnh.
+Giữ ý chính nhưng sửa toàn bộ câu ghép máy móc, đoạn thừa, lỗi logic và twist vô lý.
+Không đánh số từng đoạn.
+Audio tag phải đi cùng câu thoại hoặc cảm xúc.
+Kết quả chỉ gồm kịch bản đã viết lại.
+
+KỊCH BẢN GỐC:
+${body?.input || ""}`;
+    } else if (mode === "hooks") {
+      prompt = `Viết đúng 20 hook TikTok khác nhau dựa trên tình huống sau.
+
+TÌNH HUỐNG:
+${userPrompt}
+
+CHỦ ĐỀ:
+${theme}
+
+Yêu cầu:
+- Mỗi hook chỉ 1-2 câu.
+- Câu đầu phải cho biết rõ ai, ở đâu và chuyện gì xảy ra.
+- Có mâu thuẫn hoặc câu nói khiến người xem muốn nghe tiếp.
+- Không lặp ý, không lặp cách mở câu.
+- Không chê khách nghèo.
+- Chỉ đánh số từ 1 đến 20 trong danh sách hook.
+
+Một số hook trong kho để hiểu phong cách, tuyệt đối không sao chép:
+${hookLibrary.map((hook: { text?: string }) => `- ${hook.text || ""}`).join("\n")}`;
+    } else {
+      const versionLabels = ["A", "B", "C", "D", "E"].slice(0, versions);
+      prompt = `Viết ${versions} phiên bản kịch bản TikTok Voice Over hoàn chỉnh.
+
+Ý TƯỞNG NGƯỜI DÙNG:
+${userPrompt}
+
+CHỦ ĐỀ:
+${theme}
+
+CÔNG THỨC GỢI Ý:
+Tên: ${formula?.name || "Tự chọn"}
+Mô tả: ${formula?.description || ""}
+Cấu trúc: ${formula?.template || "Hook → Mâu thuẫn → Diễn biến → Cao trào → Twist → Kết"}
+
+Yêu cầu bắt buộc:
+- Không ghép lại nguyên văn các trường thông tin.
+- Tự suy luận để nối mọi chi tiết thành một câu chuyện có nguyên nhân và kết quả.
+- Hook là một câu mở đầu hoàn chỉnh, rõ nhân vật, bối cảnh và sự cố.
+- Sau hook mới triển khai cảm xúc và diễn biến.
+- Có ít nhất một câu thoại tự nhiên.
+- Twist phải được dẫn dắt từ diễn biến trước đó.
+- Kết thúc hợp lý, không quảng cáo lộ liễu.
+- Không đánh số từng đoạn.
+- Độ dài mỗi phiên bản khoảng 220-380 từ.
+- Không tự bịa tên máy hoặc thông số nếu người dùng chưa cung cấp.
+- Nếu có audio tag, dùng đúng kiểu: [surprised] Hả??? Cả phòng họp im bặt.
+- Không để tag đứng một mình.
+
+${
+  versions > 1
+    ? `Mỗi bản phải khác nhau rõ rệt về góc kể hoặc nhịp kể.
+Đặt nhãn đúng theo thứ tự:
+${versionLabels.map((label) => `PHIÊN BẢN ${label}`).join("\n")}`
+    : "Chỉ trả về nội dung kịch bản, không thêm tiêu đề giải thích."
+}`;
     }
 
-    const text =
-      data?.candidates?.[0]?.content?.parts
-        ?.map((part) => part?.text || "")
-        .join("")
-        .trim() || "";
+    const configuredModel = process.env.GEMINI_MODEL?.trim();
+    const candidates = [
+      configuredModel,
+      "gemini-3.5-flash-lite",
+      "gemini-3.5-flash",
+      "gemini-2.5-flash-lite",
+    ].filter((item, index, array): item is string => Boolean(item) && array.indexOf(item) === index);
 
-    if (!text) {
-      const blockReason = data?.promptFeedback?.blockReason;
+    let text = "";
+    let lastError: Error | null = null;
 
-      return NextResponse.json(
-        {
-          error: blockReason
-            ? `Gemini không tạo nội dung vì: ${blockReason}.`
-            : "Gemini không trả về nội dung.",
-        },
-        { status: 500 }
-      );
+    for (const model of candidates) {
+      try {
+        text = await generateWithModel(
+          model,
+          apiKey,
+          systemInstruction,
+          prompt,
+          jsonMode
+        );
+        lastError = null;
+        break;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error("Lỗi Gemini.");
+        const message = lastError.message.toLowerCase();
+        const canFallback =
+          message.includes("not found") ||
+          message.includes("no longer available") ||
+          message.includes("not supported") ||
+          message.includes("model");
+        if (!canFallback) break;
+      }
     }
 
-    // Giữ đúng định dạng mà giao diện V6 hiện tại đang sử dụng.
+    if (lastError || !text) {
+      throw lastError || new Error("Không tìm thấy model Gemini phù hợp.");
+    }
+
+    if (mode === "review") {
+      try {
+        const parsed = JSON.parse(cleanJson(text));
+        const scores: ScoreSet = {
+          hook: clampScore(parsed?.scores?.hook),
+          logic: clampScore(parsed?.scores?.logic),
+          twist: clampScore(parsed?.scores?.twist),
+          emotion: clampScore(parsed?.scores?.emotion),
+          retention: clampScore(parsed?.scores?.retention),
+        };
+        return NextResponse.json({
+          text: String(parsed?.analysis || "Gemini chưa trả về phần phân tích."),
+          scores,
+        });
+      } catch {
+        return NextResponse.json({
+          text,
+          scores: { hook: 0, logic: 0, twist: 0, emotion: 0, retention: 0 },
+        });
+      }
+    }
+
     return NextResponse.json({ text });
-  } catch (error: unknown) {
-    const message =
-      error instanceof Error ? error.message : "Lỗi không xác định khi gọi Gemini.";
-
-    return NextResponse.json({ error: message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Lỗi AI không xác định." },
+      { status: 500 }
+    );
   }
 }
