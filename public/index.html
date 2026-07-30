@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Content Universe AI – Siêu Di Động</title>
+<style>
+:root{
+ --bg:#f4f6fa;--card:#fff;--text:#111827;--muted:#6b7280;--line:#dce2ea;
+ --dark:#111827;--yellow:#ffd21c;--soft:#fff8cf;--blue:#eaf2ff;--green:#eaf8ef;--red:#fee8e8
+}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,Helvetica,sans-serif;color:var(--text)}
+button,input,select,textarea{font:inherit}.app{max-width:1500px;margin:auto;padding:18px}
+.header{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:16px}
+.header h1{margin:0;font-size:28px}.header p{margin:5px 0 0;color:var(--muted)}
+.btn{border:1px solid var(--line);background:#fff;border-radius:11px;padding:10px 14px;cursor:pointer;font-weight:700}
+.btn.primary{background:var(--dark);color:#fff}.btn.yellow{background:var(--yellow);border-color:var(--yellow)}
+.btn.green{background:var(--green)}.btn.red{background:var(--red)}.btn:disabled{opacity:.55;cursor:not-allowed}
+.tabs,.toolbar{display:flex;gap:8px;flex-wrap:wrap}.tabs{margin-bottom:16px}
+.tab{border:1px solid var(--line);background:#fff;border-radius:11px;padding:10px 15px;font-weight:700;cursor:pointer}
+.tab.active{background:var(--dark);color:#fff}
+.grid{display:grid;grid-template-columns:390px 1fr;gap:16px}.panel{background:#fff;border:1px solid var(--line);border-radius:18px;padding:16px}
+.panel h2{font-size:18px;margin:0}.head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:13px}
+.field{margin-bottom:12px}.field label{font-weight:700;font-size:14px;display:block;margin-bottom:6px}
+input,select,textarea{width:100%;border:1px solid var(--line);border-radius:11px;padding:11px;background:#fff}
+textarea{resize:vertical;line-height:1.55}.input-story{min-height:440px}.result{min-height:580px}
+.status{font-size:13px;color:var(--muted)}.status.ok{color:#16803b}.status.error{color:#b42318}
+.note{background:var(--blue);border:1px solid #bfd6ff;border-radius:11px;padding:11px;color:#294a73;margin-top:12px}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.card{border:1px solid var(--line);border-radius:14px;padding:14px}
+.card h3{margin:0 0 6px;font-size:16px}.card p{margin:0;color:var(--muted);line-height:1.45}
+.hidden{display:none}.badge{display:inline-block;padding:4px 8px;border-radius:999px;background:var(--soft);font-size:12px}
+.review-box{white-space:pre-wrap;line-height:1.6;border:1px solid var(--line);border-radius:12px;padding:14px;background:#fffef8;min-height:100px}
+@media(max-width:1000px){.grid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.app{padding:10px}.header{align-items:flex-start;flex-direction:column}.cards{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="app">
+ <div class="header">
+  <div><h1>CONTENT UNIVERSE AI ⭐</h1><p>Siêu Di Động – Tạo, đọc lại và hoàn thiện kịch bản TikTok</p></div>
+  <div class="toolbar">
+   <button class="btn" id="copyTop">Sao chép</button>
+   <button class="btn" id="saveTxt">Lưu TXT</button>
+   <button class="btn yellow" id="randomBtn">Ý tưởng ngẫu nhiên</button>
+  </div>
+ </div>
+
+ <div class="tabs">
+  <button class="tab active" data-tab="writer">AI Writer</button>
+  <button class="tab" data-tab="formula">Công thức</button>
+  <button class="tab" data-tab="settings">Thiết lập giọng viết</button>
+ </div>
+
+ <section id="writer">
+  <div class="grid">
+   <div class="panel">
+    <div class="head"><h2>THÔNG TIN CÂU CHUYỆN</h2><span class="badge">AI Online</span></div>
+    <div class="field"><label>Chế độ</label><select id="mode">
+     <option value="create">Viết kịch bản mới</option>
+     <option value="polish">Đọc lại và viết hoàn thiện</option>
+     <option value="review">Chỉ ra lỗi và đề xuất sửa</option>
+     <option value="hooks">Viết 10 hook khác nhau</option>
+    </select></div>
+    <div class="field"><label>Chủ đề</label><select id="theme">
+     <option>Công việc</option><option>Bị coi thường</option><option>Tình yêu</option>
+     <option>Gia đình</option><option>Học sinh – sinh viên</option><option>Game</option>
+     <option>Tiền bạc</option><option>Hiểu lầm shop</option><option>Khách đặc biệt</option>
+    </select></div>
+    <div class="field"><label>Nhân vật</label><input id="character" value="anh khách"></div>
+    <div class="field"><label>Bối cảnh</label><input id="context" value="đang gọi video với đối tác nước ngoài tại công ty"></div>
+    <div class="field"><label>Mâu thuẫn / sự cố</label><input id="conflict" value="điện thoại đứng hình đúng lúc đối tác hỏi báo giá"></div>
+    <div class="field"><label>Twist</label><input id="twist" value="sếp không đuổi việc mà hỗ trợ tiền đổi máy"></div>
+    <div class="field"><label>Kết thúc mong muốn</label><input id="ending" value="hôm sau cuộc họp diễn ra mượt và khách ký hợp đồng"></div>
+    <div class="field"><label>Độ dài</label><select id="length"><option>Ngắn, 45–60 giây</option><option selected>Vừa, 60–90 giây</option><option>Dài, 90–120 giây</option></select></div>
+    <div class="field"><label>Kịch bản có sẵn cần AI đọc lại</label><textarea id="draft" class="input-story" placeholder="Dán kịch bản vào đây khi chọn chế độ Đọc lại hoặc Review..."></textarea></div>
+    <button class="btn primary" style="width:100%" id="runAI">AI viết và hoàn thiện</button>
+    <div id="status" class="status" style="margin-top:9px">Sẵn sàng.</div>
+   </div>
+
+   <div class="panel">
+    <div class="head"><h2>KẾT QUẢ</h2><div class="toolbar"><button class="btn" id="copyResult">Sao chép</button><button class="btn green" id="polishAgain">AI chỉnh lần nữa</button></div></div>
+    <textarea id="result" class="result" placeholder="Kết quả của AI sẽ xuất hiện ở đây..."></textarea>
+    <div class="note"><b>Quy trình nên dùng:</b> AI viết lần đầu → đọc nhanh → sửa ý chính → bấm “AI chỉnh lần nữa” để AI rà logic, câu chữ, hook, twist và nhịp kể.</div>
+   </div>
+  </div>
+ </section>
+
+ <section id="formula" class="hidden">
+  <div class="panel">
+   <div class="head"><h2>CÔNG THỨC KỊCH BẢN</h2><button class="btn primary" id="saveFormula">Lưu công thức</button></div>
+   <div class="field"><label>Công thức AI phải tuân theo</label><textarea id="formulaText" style="min-height:360px"></textarea></div>
+   <div class="note">Công thức được lưu trên trình duyệt của bạn và gửi kèm mỗi lần yêu cầu AI viết.</div>
+  </div>
+ </section>
+
+ <section id="settings" class="hidden">
+  <div class="panel">
+   <div class="head"><h2>GIỌNG VIẾT SIÊU DI ĐỘNG</h2><button class="btn primary" id="saveStyle">Lưu thiết lập</button></div>
+   <div class="field"><label>Hướng dẫn cho AI</label><textarea id="styleText" style="min-height:480px"></textarea></div>
+   <div class="note">Bạn có thể thêm từ khóa thương hiệu, Audio Tag ElevenLabs hoặc những cụm từ không muốn AI sử dụng.</div>
+  </div>
+ </section>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const defaults={
+ formula:`HOOK
+- Câu đầu phải cho người nghe biết ai đang làm gì, ở đâu và chuyện gì vừa xảy ra.
+- Hook phải gây sốc nhưng vẫn dễ hiểu.
+
+DIỄN BIẾN
+- Giải thích nguyên nhân tự nhiên.
+- Mỗi đoạn phải nối được với đoạn trước.
+- Không đưa chi tiết không liên quan.
+
+CAO TRÀO
+- Tăng căng thẳng bằng lời thoại hoặc hậu quả cụ thể.
+- Đưa nhân vật tới Siêu Di Động một cách hợp lý.
+
+TWIST
+- Bẻ lái bất ngờ nhưng phải có nguyên nhân.
+- Không dùng twist vô lý chỉ để gây sốc.
+
+KẾT
+- Giải quyết mâu thuẫn ban đầu.
+- Kết ngắn, vui hoặc để lại cảm xúc.
+- Không quảng cáo lộ liễu.`,
+ style:`Bạn là TikToker chuyên kể chuyện công nghệ cho Siêu Di Động.
+
+Yêu cầu:
+- Viết giống người thật đang kể một chuyện vừa xảy ra tại shop.
+- Không viết kiểu MC, bài quảng cáo hoặc review khô.
+- Dùng tiếng Việt đời thường, dễ đọc bằng giọng Adam ElevenLabs V3.
+- Cấu trúc: Hook → Mâu thuẫn → Diễn biến → Cao trào → Twist → Kết.
+- Hook không cần Audio Tag. Các đoạn sau có thể dùng [surprised], [whispering], [gasping], [realization], [playful].
+- Sau Audio Tag phải có cảm xúc ngắn rồi mới kể tiếp.
+- Có thể dùng: mấy má, ê ê ê, dữ thần, thiệt luôn á, dứt lẹ.
+- Không dùng: chốt đơn, siêu phẩm, xuống tiền, múc, cấu hình khủng.
+- Không chê khách nghèo.
+- Không tự bịa thông số máy nếu người dùng chưa cung cấp.
+- Khi đọc lại, phải sửa các đoạn ghép máy móc, lặp ý, thiếu nguyên nhân hoặc twist không hợp lý.
+- Chỉ trả về nội dung cần dùng, không giải thích dài dòng.`
+};
+$("formulaText").value=localStorage.getItem("cu_formula")||defaults.formula;
+$("styleText").value=localStorage.getItem("cu_style")||defaults.style;
+$("draft").value=localStorage.getItem("cu_draft")||"";
+$("result").value=localStorage.getItem("cu_result")||"";
+
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>{
+ document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===b));
+ ["writer","formula","settings"].forEach(id=>$(id).classList.toggle("hidden",id!==b.dataset.tab));
+});
+$("saveFormula").onclick=()=>{localStorage.setItem("cu_formula",$("formulaText").value);alert("Đã lưu công thức.");};
+$("saveStyle").onclick=()=>{localStorage.setItem("cu_style",$("styleText").value);alert("Đã lưu giọng viết.");};
+
+function fallbackCopy(text){
+ const ta=document.createElement("textarea");ta.value=text;ta.style.position="fixed";ta.style.opacity="0";
+ document.body.appendChild(ta);ta.focus();ta.select();const ok=document.execCommand("copy");ta.remove();return ok;
+}
+async function copyText(text){
+ if(!text){alert("Chưa có nội dung để sao chép.");return}
+ try{
+  if(navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+  else if(!fallbackCopy(text)) throw new Error();
+  alert("Đã sao chép.");
+ }catch{alert("Không thể sao chép. Hãy chọn nội dung và nhấn Ctrl+C.");}
+}
+$("copyTop").onclick=()=>copyText($("result").value||$("draft").value);
+$("copyResult").onclick=()=>copyText($("result").value);
+
+function payload(modeOverride){
+ return {
+  mode:modeOverride||$("mode").value,
+  theme:$("theme").value,character:$("character").value,context:$("context").value,
+  conflict:$("conflict").value,twist:$("twist").value,ending:$("ending").value,
+  length:$("length").value,draft:$("draft").value,result:$("result").value,
+  formula:$("formulaText").value,style:$("styleText").value
+ };
+}
+async function callAI(modeOverride){
+ const btn=$("runAI");btn.disabled=true;$("polishAgain").disabled=true;
+ $("status").className="status";$("status").textContent="AI đang đọc và chỉnh sửa...";
+ try{
+  const res=await fetch("/api/ai",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload(modeOverride))});
+  const data=await res.json();
+  if(!res.ok)throw new Error(data.error||"Không gọi được AI.");
+  $("result").value=data.text;
+  localStorage.setItem("cu_result",data.text);
+  localStorage.setItem("cu_draft",$("draft").value);
+  $("status").className="status ok";$("status").textContent="Hoàn tất.";
+ }catch(e){
+  $("status").className="status error";$("status").textContent=e.message;
+ }finally{btn.disabled=false;$("polishAgain").disabled=false}
+}
+$("runAI").onclick=()=>callAI();
+$("polishAgain").onclick=()=>{
+ if(!$("result").value.trim()){alert("Chưa có kịch bản để chỉnh.");return}
+ $("draft").value=$("result").value;$("mode").value="polish";callAI("polish");
+};
+$("saveTxt").onclick=()=>{
+ const text=$("result").value||$("draft").value;if(!text)return alert("Chưa có nội dung.");
+ const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([text],{type:"text/plain;charset=utf-8"}));
+ a.download="kich-ban-sieu-di-dong.txt";a.click();URL.revokeObjectURL(a.href);
+};
+$("randomBtn").onclick=()=>{
+ const sets=[
+  ["Công việc","anh khách","đang gọi video với đối tác nước ngoài tại công ty","điện thoại đứng hình đúng lúc đối tác hỏi báo giá","sếp nói nghiêm trọng nhưng sau đó hỗ trợ tiền đổi máy","hôm sau khách ký được hợp đồng"],
+  ["Bị coi thường","em khách","đi cà phê với hội bạn","bị cả nhóm chê Android cỏ","người chê nhiều nhất lại xin địa chỉ shop","một tuần sau người đó cũng tới mua máy"],
+  ["Gia đình","em khách","đang học online môn tiếng Anh","máy sập nguồn đúng lúc thầy gọi trả bài","mẹ tưởng con đòi chơi nhưng cuối cùng chọn bản cao hơn","buổi học sau em khách được điểm cao"],
+  ["Hiểu lầm shop","anh khách","vừa bước vào shop đòi gặp quản lý","nghi shop quảng cáo máy không đúng","test xong khách lại hỏi còn màu khác không","khách quay lại dẫn thêm bạn tới mua"]
+ ];
+ const r=sets[Math.floor(Math.random()*sets.length)];
+ ["theme","character","context","conflict","twist","ending"].forEach((id,i)=>$(id).value=r[i]);
+};
+</script>
+</body>
+</html>
