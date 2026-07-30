@@ -1,7 +1,0 @@
-V15.1 validation result
-
-- JSX syntax error around app/page.tsx lines 1477–1480: FIXED.
-- TypeScript parser successfully parsed app/page.tsx.
-- The only local TypeScript diagnostic was that React dependencies were unavailable in the temporary runtime.
-- A complete Next.js production build could not be executed locally because npm dependencies could not be installed in this runtime.
-- Vercel will install the dependencies from package.json during deployment.
