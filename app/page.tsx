@@ -977,7 +977,7 @@ export default function Home() {
           </div>
           <div className="brand-copy">
             <strong>CONTENT UNIVERSE</strong>
-            <small>Siêu Di Động · V18.1</small>
+            <small>Siêu Di Động · V18.2</small>
           </div>
           <button
             className="mobile-drawer-close"
@@ -1213,7 +1213,7 @@ export default function Home() {
                 </div>
 
                 <div className="controls">
-                  <label className="topic-control">
+                  <label className="topic-control control-topic">
                     <span>Chủ đề</span>
                     <div className="select-with-action">
                       <select value={theme} onChange={(event) => setTheme(event.target.value)}>
@@ -1230,14 +1230,14 @@ export default function Home() {
                       </button>
                     </div>
                   </label>
-                  <label>
+                  <label className="control-formula">
                     <span>Công thức</span>
                     <select value={formulaId} onChange={(event) => setFormulaId(event.target.value)}>
                       {formulas.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
                     </select>
                   </label>
 
-                  <label>
+                  <label className="control-prompt">
                     <span>Prompt Style</span>
                     <div className="select-with-action">
                       <select value={selectedPromptId} onChange={(event) => setSelectedPromptId(event.target.value)}>
@@ -1257,7 +1257,7 @@ export default function Home() {
                       </button>
                     </div>
                   </label>
-                  <label>
+                  <label className="control-version">
                     <span>Phiên bản</span>
                     <select value={versions} onChange={(event) => setVersions(Number(event.target.value))}>
                       <option value={1}>1 bản</option>
@@ -1266,7 +1266,7 @@ export default function Home() {
                     </select>
                   </label>
 
-                  <label>
+                  <label className="control-length">
                     <span>Độ dài kịch bản</span>
                     <select
                       value={scriptLength}
@@ -1281,21 +1281,29 @@ export default function Home() {
                   </label>
                 </div>
 
-                <div className="story-summary">
-                  <span>Nhân vật chính</span>
-                  <strong>{resolvedBuyerType}</strong>
-                  <span>Đi cùng</span>
-                  <strong>{resolvedCompanion}</strong>
-                  <span>Bối cảnh</span>
-                  <strong>{resolvedLocation}</strong>
-                  <span>Độ dài</span>
-                  <strong>
-                    {scriptLength === "short"
-                      ? "Ngắn · 45–60 giây"
-                      : scriptLength === "medium"
-                        ? "Vừa · 60–90 giây"
-                        : "Dài · 90–120 giây"}
-                  </strong>
+                <div className="story-summary story-summary-v18-2">
+                  <div>
+                    <span>Nhân vật chính</span>
+                    <strong>{resolvedBuyerType}</strong>
+                  </div>
+                  <div>
+                    <span>Đi cùng</span>
+                    <strong>{resolvedCompanion}</strong>
+                  </div>
+                  <div>
+                    <span>Bối cảnh</span>
+                    <strong>{resolvedLocation}</strong>
+                  </div>
+                  <div>
+                    <span>Độ dài</span>
+                    <strong>
+                      {scriptLength === "short"
+                        ? "Ngắn · 45–60 giây"
+                        : scriptLength === "medium"
+                          ? "Vừa · 60–90 giây"
+                          : "Dài · 90–120 giây"}
+                    </strong>
+                  </div>
                 </div>
 
                 <div className="quick">

@@ -1,6 +1,6 @@
 {
-  "name": "content-universe-v18-1-build-fixed",
-  "version": "13.0.1",
+  "name": "content-universe-v18-2-responsive-studio",
+  "version": "13.0.2",
   "private": true,
   "scripts": {
     "dev": "next dev",
