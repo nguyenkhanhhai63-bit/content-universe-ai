@@ -1,0 +1,15 @@
+Content Universe V19 – Content Ops
+
+Đã nâng cấp trực tiếp từ source V18.2 người dùng tải lên.
+
+Tính năng:
+- Knowledge Base dùng tự động cho Gemini.
+- Viết lại một chạm theo Viral, Hài, Drama, Cảm xúc, Rút ngắn và Bán hàng mềm.
+- Lịch sử tối đa 30 phiên bản và khôi phục trong AI Studio.
+- Xuất TXT và Markdown.
+- Sao lưu/khôi phục thêm Prompt, Knowledge Base và lịch sử.
+- Cập nhật nhận diện phiên bản V19.
+
+Kiểm tra:
+- TypeScript parser chạy qua app/page.tsx và app/api/ai/route.ts, không phát hiện lỗi cú pháp hoặc lỗi type nội bộ từ code mới.
+- Production build không chạy được do npm registry nội bộ trả 404 khi tải @types/node. Đây là giới hạn môi trường tạo file, không phải lỗi source được báo bởi TypeScript.
