@@ -1,0 +1,17 @@
+Content Universe V18.1
+
+Đã sửa lỗi Vercel:
+app/page.tsx:583
+An object literal cannot have multiple properties with the same name.
+
+Nguyên nhân:
+scriptLength bị khai báo hai lần trong object lưu localStorage.
+
+Đã sửa:
+- Chỉ giữ một thuộc tính scriptLength.
+- Thêm scriptLength đúng một lần vào dependency của useEffect.
+- Giữ nguyên Prompt Engine V18.
+
+Ghi chú:
+Môi trường tạo file không tải được package từ npm registry nội bộ nên không thể chạy
+Next.js production build tại đây. Lỗi TypeScript được Vercel báo đã được sửa trực tiếp.
