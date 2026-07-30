@@ -1,9 +1,1 @@
-{
-  "name": "content-universe-ai",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev": "vercel dev"
-  }
-}
+{"name":"content-universe-v5","version":"1.0.0","private":true,"type":"module"}

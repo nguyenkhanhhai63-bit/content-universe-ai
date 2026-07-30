@@ -1,36 +1,9 @@
-# Content Universe AI – Siêu Di Động
+# Content Universe V5
 
-## Chức năng
+Thay toàn bộ file trong repository GitHub hiện tại bằng các file trong thư mục này rồi Commit changes. Vercel sẽ tự deploy.
 
-- Viết kịch bản mới bằng AI.
-- Đọc lại và viết hoàn thiện kịch bản có sẵn.
-- Chỉ ra lỗi logic, hook, twist và cách sửa.
-- Sinh 10 hook khác nhau.
-- Tự chỉnh công thức và giọng viết.
-- Sao chép hoạt động khi chạy online.
-- Lưu nội dung trong trình duyệt.
+Biến môi trường:
+- OPENAI_API_KEY
+- OPENAI_MODEL
 
-## Đưa website lên Vercel
-
-1. Tạo tài khoản Vercel.
-2. Tạo project mới và tải thư mục này lên GitHub, hoặc dùng Vercel CLI.
-3. Trong Project Settings → Environment Variables, thêm:
-   - `OPENAI_API_KEY`: khóa API OpenAI của bạn.
-   - `OPENAI_MODEL`: tên model bạn muốn sử dụng, ví dụ `gpt-5.6`.
-4. Deploy lại project.
-
-Không đặt khóa API trong `index.html` hoặc mã frontend.
-
-## Chạy thử bằng Vercel CLI
-
-```bash
-npm install -g vercel
-vercel dev
-```
-
-Tạo file `.env.local`:
-
-```env
-OPENAI_API_KEY=...
-OPENAI_MODEL=gpt-5.6
-```
+Bản nháp miễn phí, kho Hook, công thức, kịch bản và thống kê vẫn hoạt động khi API hết credit.
