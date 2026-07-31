@@ -1,6 +1,6 @@
 {
-  "name": "content-universe-v21-personal-sync",
-  "version": "21.0.0",
+  "name": "content-universe-v22-learning-engine",
+  "version": "22.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

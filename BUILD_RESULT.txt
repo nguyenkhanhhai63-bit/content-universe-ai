@@ -1,4 +1,4 @@
-Content Universe V21 – Personal Cloud Sync
+Content Universe V22 – Learning Engine
 
 Đã kiểm tra:
 - TypeScript/TSX parser: app/page.tsx, app/api/sync/route.ts và app/api/ai/route.ts không có lỗi cú pháp.
