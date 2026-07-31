@@ -1,8 +1,0 @@
-Content Universe V22 – Learning Engine
-
-Đã kiểm tra:
-- TypeScript/TSX parser: app/page.tsx, app/api/sync/route.ts và app/api/ai/route.ts không có lỗi cú pháp.
-- Đã loại bỏ thuộc tính JSX value bị lặp trong ô AI Chat.
-- API đồng bộ yêu cầu mã bí mật tối thiểu 8 ký tự và chỉ lưu workspace ID đã băm SHA-256.
-
-Chưa thể chạy `next build` trong môi trường đóng gói vì npm registry nội bộ trả 404 khi tải @types/node. Source không kèm node_modules; Vercel sẽ cài dependency từ registry của Vercel khi deploy.
