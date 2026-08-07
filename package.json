@@ -1,6 +1,6 @@
 {
-  "name": "content-universe-v28-adaptive-ai",
-  "version": "28.0.0",
+  "name": "content-universe-v29-community-ux",
+  "version": "29.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

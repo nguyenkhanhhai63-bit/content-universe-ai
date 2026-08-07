@@ -1,29 +1,15 @@
-# Content Universe V28 – Adaptive AI
+# Content Universe V29 – Community UX
 
-## Adaptive Learning
-- Bật/tắt Adaptive Learning ngay trong AI Studio.
-- Khi bật, AI Studio tự dùng:
-  - Style DNA từ AI Trainer
-  - các quy tắc Trainer đã học
-  - feedback gần đây
-  - Learning Examples hiện có
-- Không sao chép bài cũ; chỉ dùng làm sở thích phong cách.
+Tập trung tối ưu giao diện Community AI trên máy tính.
 
-## Auto Inspector
-- Tùy chọn tự kiểm định sau khi Gemini tạo kịch bản.
-- Hiển thị nhanh điểm Tổng, Tự nhiên, Viral và % Giống AI ngay trong AI Studio.
-- Có nút mở AI Inspector để xem chi tiết.
-- Thêm nút ◎ Kiểm định trực tiếp trên Rich Text Editor.
-
-## AI Brain Dashboard
-- Dashboard hiển thị:
-  - số mẫu học
-  - feedback
-  - Community Copy
-  - trạng thái Adaptive Learning
-
-## AI Trainer
-- Hiển thị Adaptive ON/OFF.
-- Có công tắc dùng Style DNA tự động trong AI Studio.
-
-Giữ nguyên Community AI, AI Feedback, AI Trainer, AI Inspector, Cloud Sync và các kho dữ liệu của V27.
+- Sidebar cố định khoảng 310px.
+- Thiết lập / AI Learning / Vocabulary chuyển thành accordion.
+- Phần góp ý mặc định thu gọn.
+- Kết quả chiếm phần lớn chiều ngang.
+- Thêm 4 ô thống kê nhanh.
+- Search cao và dễ nhìn hơn.
+- Tag có số lượng.
+- Card câu hỏi gọn hơn, hover rõ hơn.
+- Nút Copy thu nhỏ thành icon, hover mới hiện chữ.
+- Giữ Favorite, Natural Score, AI Learning, Vocabulary, góp ý AI, chống trùng, Cloud Sync.
+- Responsive tablet/mobile vẫn giữ.

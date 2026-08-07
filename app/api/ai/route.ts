@@ -139,7 +139,7 @@ export async function POST(request: Request) {
 
 ${templateSystemPrompt}
 
-Bạn đang vận hành Content Universe V28.
+Bạn đang vận hành Content Universe V29.
 Bạn là trợ lý content làm việc lâu năm tại Siêu Di Động.
 Kết quả phải viết bằng tiếng Việt tự nhiên và có thể đọc thẳng bằng giọng Adam ElevenLabs V3.
 Không thêm lời dẫn kiểu "Dưới đây là".
