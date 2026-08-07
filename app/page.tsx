@@ -715,6 +715,7 @@ export default function Home() {
     setKnowledge(data.knowledge || defaultKnowledge);
     setVersionsHistory(Array.isArray(data.versionsHistory) ? data.versionsHistory : []);
     setLearningExamples(Array.isArray(data.learningExamples) ? data.learningExamples : []);
+    setStudioFeedbackMemory(Array.isArray(data.studioFeedbackMemory) ? data.studioFeedbackMemory : []);
     setCommunityExamples(typeof data.communityExamples === "string" ? data.communityExamples : defaultCommunityExamples);
     setCommunityCopiedExamples(Array.isArray(data.communityCopiedExamples) ? data.communityCopiedExamples : []);
     setCommunitySettings(data.communitySettings || defaultCommunitySettings);
@@ -808,7 +809,7 @@ export default function Home() {
     selectedPromptId, messages, knowledge, versionsHistory, buyerType,
     customBuyerType, companion, customCompanion, location, hookSpeaker,
     customHookSpeaker, openingEmotion, theme, formulaId, versions, scriptLength,
-    idea, result, title, learningExamples, communityExamples, communityCopiedExamples, communitySettings, communityQuestions, syncKey,
+    idea, result, title, learningExamples, studioFeedbackMemory, communityExamples, communityCopiedExamples, communitySettings, communityQuestions, syncKey,
   ]);
 
   useEffect(() => {
@@ -1312,13 +1313,20 @@ export default function Home() {
     if (!result.trim()) return;
     await navigator.clipboard.writeText(result);
     saveStudioFeedbackMemory(result, { copied: true, rating: Math.max(studioRating, 4) });
-    learnFromCopy(result, title || "AI Studio", theme || "AI Studio", "studio");
+    learnFromCopiedScript(result, "studio", title || "AI Studio", theme || "AI Studio");
     setStatus("Đã sao chép · AI ghi nhận đây là kết quả đạt.");
   }
 
   function saveStudioAsTemplate() {
     if (!result.trim()) return;
-    const signals = analyzeLearningSignals(result);
+    const clean = result.trim();
+    const firstLine = clean.split("\n").find((line) => line.trim())?.trim() || clean.slice(0, 120);
+    const signals = {
+      opening: firstLine.slice(0, 180),
+      hasDialogue: /[“"].+?[”"]|:\s*[“"]/.test(clean),
+      hasAudioTags: /\[[^\]]+\]/.test(clean),
+      approximateWords: clean.split(/\s+/).filter(Boolean).length,
+    };
     const item: LearningExample = {
       id: makeId(),
       content: result,
@@ -1416,7 +1424,7 @@ export default function Home() {
   }
 
   function exportData() {
-    const data = JSON.stringify({ hooks, formulas, scripts, style, promptTemplates, knowledge, versionsHistory, learningExamples }, null, 2);
+    const data = JSON.stringify({ hooks, formulas, scripts, style, promptTemplates, knowledge, versionsHistory, learningExamples, studioFeedbackMemory, communityExamples, communityCopiedExamples, communitySettings, communityQuestions }, null, 2);
     const url = URL.createObjectURL(new Blob([data], { type: "application/json" }));
     const link = document.createElement("a");
     link.href = url;
@@ -1611,7 +1619,7 @@ export default function Home() {
           </div>
           <div className="brand-copy">
             <strong>CONTENT UNIVERSE</strong>
-            <small>Siêu Di Động · V26</small>
+            <small>Siêu Di Động · V26.1</small>
           </div>
           <button
             className="mobile-drawer-close"
