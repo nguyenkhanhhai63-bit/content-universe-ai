@@ -111,6 +111,13 @@ export async function POST(request: Request) {
     const studioFeedback = Array.isArray(body?.feedback) ? body.feedback.slice(0, 20) : [];
     const studioRatingInput = Number(body?.rating || 0);
     const studioFeedbackMemoryInput = Array.isArray(body?.studioFeedbackMemory) ? body.studioFeedbackMemory.slice(0, 30) : [];
+    const trainerExamples = Array.isArray(body?.trainerExamples) ? body.trainerExamples.slice(0, 40) : [];
+    const trainerFeedbackMemory = Array.isArray(body?.feedbackMemory) ? body.feedbackMemory.slice(0, 60) : [];
+    const trainerCopiedExamples = Array.isArray(body?.copiedExamples) ? body.copiedExamples.slice(0, 40) : [];
+    const inspectorAnalysis = String(body?.analysis || "");
+    const adaptiveLearningInput = body?.adaptiveLearning !== false;
+    const trainerAnalysisInput = body?.trainerAnalysis || null;
+    const adaptiveFeedbackMemory = Array.isArray(body?.feedbackMemory) ? body.feedbackMemory.slice(0, 40) : [];
 
     const renderTemplate = (template: string) =>
       template
@@ -132,7 +139,7 @@ export async function POST(request: Request) {
 
 ${templateSystemPrompt}
 
-Bạn đang vận hành Content Universe V26.
+Bạn đang vận hành Content Universe V28.
 Bạn là trợ lý content làm việc lâu năm tại Siêu Di Động.
 Kết quả phải viết bằng tiếng Việt tự nhiên và có thể đọc thẳng bằng giọng Adam ElevenLabs V3.
 Không thêm lời dẫn kiểu "Dưới đây là".
@@ -145,6 +152,30 @@ ${learningExamples.map((item: any, index: number) => `MẪU ${index + 1} · ${it
 ${String(item.content || "").slice(0, 1800)}`).join("\n\n---\n\n")}
 
 Hãy học nhịp kể, độ dài câu, cấu trúc hook, mâu thuẫn, twist và cách kết. Ưu tiên đặc điểm xuất hiện trong mẫu được Copy nhiều lần. Tuyệt đối không sao chép nguyên văn hoặc tái sử dụng y hệt tình huống. Không nhắc tới dữ liệu học trong kết quả.` : ""}`;
+
+    const adaptiveContext = adaptiveLearningInput
+      ? `
+ADAPTIVE LEARNING ĐANG BẬT.
+STYLE DNA:
+${trainerAnalysisInput?.summary || "(chưa có phân tích Trainer)"}
+
+QUY TẮC ĐÃ HỌC:
+${Array.isArray(trainerAnalysisInput?.rules) && trainerAnalysisInput.rules.length
+  ? trainerAnalysisInput.rules.map((item: unknown) => `- ${String(item)}`).join("\n")
+  : "(chưa có quy tắc Trainer)"}
+
+FEEDBACK GẦN ĐÂY:
+${adaptiveFeedbackMemory.length
+  ? adaptiveFeedbackMemory
+      .flatMap((item: any) => Array.isArray(item.feedback) ? item.feedback : [])
+      .slice(0, 20)
+      .map((item: unknown) => `- ${String(item)}`)
+      .join("\n")
+  : "(chưa có feedback)"}
+
+Hãy coi các dữ liệu trên là sở thích phong cách, không được sao chép nguyên văn bài cũ.
+`
+      : "";
 
     let prompt = "";
     let jsonMode = false;
@@ -167,7 +198,7 @@ ${studioRatingInput ? `${studioRatingInput}/5 sao` : "chưa chấm"}
 GÓP Ý:
 ${studioFeedback.length ? studioFeedback.map((item: string) => `- ${item}`).join("\n") : "- Sửa tự nhiên hơn"}
 
-MEMORY TỪ NHỮNG LẦN GÓP Ý TRƯỚC:
+STYLE DNA HIỆN TẠI:\n${adaptiveContext}\n\nMEMORY TỪ NHỮNG LẦN GÓP Ý TRƯỚC:
 ${studioFeedbackMemoryInput.length ? studioFeedbackMemoryInput.map((item: any) => Array.isArray(item.feedback) ? `- ${item.feedback.join(", ")}` : "").filter(Boolean).join("\n") : "(chưa có)"}
 
 YÊU CẦU:
@@ -272,23 +303,75 @@ ${transcript}
 
 TIN NHẮN MỚI:
 ${input}`;
-    } else if (mode === "review") {
+    } else if (mode === "trainer") {
       jsonMode = true;
-      prompt = `Chấm kịch bản sau và trả về đúng JSON:
+      prompt = `Phân tích các bài mẫu mà người dùng muốn AI học phong cách.
+
+BÀI MẪU:
+${trainerExamples.length ? trainerExamples.map((item: string, index: number) => `--- MẪU ${index + 1} ---\n${item}`).join("\n\n") : input}
+
+FEEDBACK ĐÃ HỌC:
+${trainerFeedbackMemory.length ? trainerFeedbackMemory.map((item: any) => Array.isArray(item.feedback) ? `- ${item.feedback.join(", ")}` : "").filter(Boolean).join("\n") : "(chưa có)"}
+
+MẪU ĐƯỢC COPY / XÁC NHẬN TỐT:
+${trainerCopiedExamples.length ? trainerCopiedExamples.map((item: any) => `- ${String(item.content || "").slice(0, 600)}`).join("\n") : "(chưa có)"}
+
+Không sao chép nội dung. Hãy rút ra DNA phong cách.
+
+Trả đúng JSON:
+{
+  "summary": "Tóm tắt ngắn AI đã hiểu phong cách gì",
+  "rules": ["quy tắc 1","quy tắc 2","..."],
+  "dna": {
+    "hook": 0-100,
+    "storytelling": 0-100,
+    "natural": 0-100,
+    "twist": 0-100,
+    "salesSoftness": 0-100
+  }
+}`;
+    } else if (mode === "inspector") {
+      jsonMode = true;
+      prompt = `Đóng vai AI Inspector chuyên kiểm định kịch bản TikTok cho Siêu Di Động.
+
+Chấm rất thực tế, không tâng bốc. Trả đúng JSON:
 {
   "scores": {
     "hook": 0-10,
-    "drama": 0-10,
     "twist": 0-10,
     "retention": 0-10,
     "natural": 0-10,
+    "logic": 0-10,
+    "viral": 0-10,
+    "aiLike": 0-10,
+    "adRisk": 0-10,
     "overall": 0-10
   },
-  "analysis": "Phân tích bằng tiếng Việt gồm Điểm mạnh, Điểm yếu, Cách sửa và Bản viết lại gợi ý."
+  "analysis": "Viết ngắn gọn theo 4 phần: Điểm mạnh; Vấn đề; Nên sửa; Gợi ý cụ thể."
 }
+
+Trong đó:
+- aiLike: 0 là hoàn toàn tự nhiên, 10 là rất giống AI.
+- adRisk: 0 là không có cảm giác quảng cáo, 10 là quảng cáo rất lộ.
+- overall phải cân nhắc cả điểm mạnh và hai rủi ro trên.
 
 KỊCH BẢN:
 ${input}`;
+    } else if (mode === "inspector_fix") {
+      prompt = `Sửa trực tiếp kịch bản theo kết quả kiểm định dưới đây.
+
+KỊCH BẢN:
+${input}
+
+PHÂN TÍCH INSPECTOR:
+${inspectorAnalysis}
+
+Yêu cầu:
+- Sửa các lỗi Inspector chỉ ra.
+- Tăng độ tự nhiên và giữ chân.
+- Giảm cảm giác AI và quảng cáo.
+- Không giải thích.
+- Chỉ trả về kịch bản hoàn chỉnh đã sửa.`;
     } else if (mode === "rewrite") {
       prompt = `Viết lại kịch bản sau theo phong cách: ${rewriteStyle}.
 Vẫn phải là bản TikTok Voice Over hoàn chỉnh.
@@ -330,9 +413,7 @@ ${hooks.map((item: { text?: string }) => `- ${item.text || ""}`).join("\n")}`;
 
       if (promptTemplate?.userPrompt) {
         const basePrompt = renderTemplate(String(promptTemplate.userPrompt));
-        prompt = `${basePrompt}
-
-SỐ PHIÊN BẢN:
+        prompt = `${basePrompt}\n\n${adaptiveContext}\n\nSỐ PHIÊN BẢN:
 ${versions}
 
 ${
@@ -343,9 +424,7 @@ ${labels.map((label) => `PHIÊN BẢN ${label}`).join("\n")}`
     : "Chỉ trả về một kịch bản hoàn chỉnh."
 }`;
       } else {
-        prompt = `Viết ${versions} phiên bản kịch bản TikTok Voice Over hoàn chỉnh.
-
-Ý TƯỞNG:
+        prompt = `Viết ${versions} phiên bản kịch bản TikTok Voice Over hoàn chỉnh.\n\n${adaptiveContext}\n\nÝ TƯỞNG:
 ${idea}
 
 CHỦ ĐỀ:
@@ -423,6 +502,53 @@ ${labels.map((label) => `PHIÊN BẢN ${label}`).join("\n")}`
 
     if (lastError || !text) throw lastError || new Error("Không tìm thấy model Gemini phù hợp.");
 
+    if (mode === "trainer") {
+      try {
+        const parsed = JSON.parse(stripJson(text));
+        return NextResponse.json({
+          analysis: {
+            summary: String(parsed?.summary || ""),
+            rules: Array.isArray(parsed?.rules) ? parsed.rules.map((item: unknown) => String(item)) : [],
+            dna: {
+              hook: Math.max(0, Math.min(100, Number(parsed?.dna?.hook || 0))),
+              storytelling: Math.max(0, Math.min(100, Number(parsed?.dna?.storytelling || 0))),
+              natural: Math.max(0, Math.min(100, Number(parsed?.dna?.natural || 0))),
+              twist: Math.max(0, Math.min(100, Number(parsed?.dna?.twist || 0))),
+              salesSoftness: Math.max(0, Math.min(100, Number(parsed?.dna?.salesSoftness || 0))),
+            }
+          }
+        });
+      } catch {
+        return NextResponse.json({ analysis: { summary: text, rules: [], dna: { hook:0, storytelling:0, natural:0, twist:0, salesSoftness:0 } } });
+      }
+    }
+
+    if (mode === "inspector") {
+      try {
+        const parsed = JSON.parse(stripJson(text));
+        const s = parsed?.scores || {};
+        return NextResponse.json({
+          text: String(parsed?.analysis || "Chưa có phân tích."),
+          scores: {
+            hook: score(s.hook),
+            twist: score(s.twist),
+            retention: score(s.retention),
+            natural: score(s.natural),
+            logic: score(s.logic),
+            viral: score(s.viral),
+            aiLike: score(s.aiLike),
+            adRisk: score(s.adRisk),
+            overall: score(s.overall),
+          }
+        });
+      } catch {
+        return NextResponse.json({
+          text,
+          scores: { hook:0, twist:0, retention:0, natural:0, logic:0, viral:0, aiLike:0, adRisk:0, overall:0 }
+        });
+      }
+    }
+
     if (mode === "community" || mode === "community_refine") {
       try {
         const parsed = JSON.parse(stripJson(text));
@@ -436,36 +562,6 @@ ${labels.map((label) => `PHIÊN BẢN ${label}`).join("\n")}`
           .map((line) => line.replace(/^\s*\d+[.)-]?\s*/, "").trim())
           .filter(Boolean);
         return NextResponse.json({ questions });
-      }
-    }
-
-    if (mode === "review") {
-      try {
-        const parsed = JSON.parse(stripJson(text));
-        const scores: Scores = {
-          hook: score(parsed?.scores?.hook),
-          drama: score(parsed?.scores?.drama),
-          twist: score(parsed?.scores?.twist),
-          retention: score(parsed?.scores?.retention),
-          natural: score(parsed?.scores?.natural),
-          overall: score(parsed?.scores?.overall),
-        };
-        return NextResponse.json({
-          text: String(parsed?.analysis || "Gemini chưa trả về phân tích."),
-          scores,
-        });
-      } catch {
-        return NextResponse.json({
-          text,
-          scores: {
-            hook: 0,
-            drama: 0,
-            twist: 0,
-            retention: 0,
-            natural: 0,
-            overall: 0,
-          },
-        });
       }
     }
 

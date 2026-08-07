@@ -40,11 +40,26 @@ type ChatMessage = {
 
 type ReviewScores = {
   hook: number;
-  drama: number;
   twist: number;
   retention: number;
   natural: number;
+  logic: number;
+  viral: number;
+  aiLike: number;
+  adRisk: number;
   overall: number;
+};
+
+type TrainerAnalysis = {
+  summary: string;
+  rules: string[];
+  dna: {
+    hook: number;
+    storytelling: number;
+    natural: number;
+    twist: number;
+    salesSoftness: number;
+  };
 };
 
 type ScriptVersion = {
@@ -524,8 +539,8 @@ const defaultKnowledge: KnowledgeBase = {
 const nav = [
   ["dashboard", "⌂", "Tổng quan"],
   ["studio", "✦", "AI Studio"],
-  ["chat", "◌", "AI Chat"],
-  ["review", "◎", "AI đọc lại"],
+  ["trainer", "◆", "AI Trainer"],
+  ["inspector", "◎", "AI Inspector"],
   ["community", "◉", "Community AI"],
   ["hooks", "↗", "Kho Hook"],
   ["formulas", "◇", "Kho Công thức"],
@@ -592,6 +607,12 @@ export default function Home() {
   const [reviewInput, setReviewInput] = useState("");
   const [reviewResult, setReviewResult] = useState("");
   const [scores, setScores] = useState<ReviewScores | null>(null);
+  const [trainerInput, setTrainerInput] = useState("");
+  const [trainerAnalysis, setTrainerAnalysis] = useState<TrainerAnalysis | null>(null);
+  const [trainerLoading, setTrainerLoading] = useState(false);
+  const [adaptiveLearning, setAdaptiveLearning] = useState(true);
+  const [autoInspect, setAutoInspect] = useState(false);
+  const [lastInspectionScores, setLastInspectionScores] = useState<ReviewScores | null>(null);
   const [chatInput, setChatInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -728,7 +749,7 @@ export default function Home() {
       selectedPromptId, messages, knowledge, versionsHistory, buyerType,
       customBuyerType, companion, customCompanion, location, hookSpeaker,
       customHookSpeaker, openingEmotion, theme, formulaId, versions, scriptLength,
-      idea, result, title, learningExamples, studioFeedbackMemory, communityExamples, communityCopiedExamples, communitySettings, communityQuestions,
+      idea, result, title, learningExamples, studioFeedbackMemory, trainerInput, trainerAnalysis, adaptiveLearning, autoInspect, lastInspectionScores, communityExamples, communityCopiedExamples, communitySettings, communityQuestions,
     };
   }
 
@@ -808,7 +829,7 @@ export default function Home() {
     selectedPromptId, messages, knowledge, versionsHistory, buyerType,
     customBuyerType, companion, customCompanion, location, hookSpeaker,
     customHookSpeaker, openingEmotion, theme, formulaId, versions, scriptLength,
-    idea, result, title, learningExamples, studioFeedbackMemory, communityExamples, communityCopiedExamples, communitySettings, communityQuestions, syncKey,
+    idea, result, title, learningExamples, studioFeedbackMemory, trainerInput, trainerAnalysis, adaptiveLearning, autoInspect, lastInspectionScores, communityExamples, communityCopiedExamples, communitySettings, communityQuestions, syncKey,
   ]);
 
   useEffect(() => {
@@ -986,6 +1007,9 @@ export default function Home() {
         promptTemplate: selectedPrompt,
         knowledge,
         learningExamples: learningExamples.slice(0, 12),
+        adaptiveLearning,
+        trainerAnalysis,
+        feedbackMemory: studioFeedbackMemory.slice(0, 40),
         communityExamples,
         communityCopiedExamples: communityCopiedExamples.slice(0, 80),
         ...payload,
@@ -1041,6 +1065,12 @@ export default function Home() {
       addVersion(result, "Trước khi tạo bản mới");
       setResult(data.text);
       setTitle(`${theme} – ${new Date().toLocaleDateString("vi-VN")}`);
+      if (autoInspect && data.text) {
+        try {
+          const inspection = await callAI("inspector", { input: data.text });
+          if (inspection.scores) setLastInspectionScores(inspection.scores);
+        } catch {}
+      }
     } catch {}
   }
 
@@ -1053,15 +1083,84 @@ export default function Home() {
     } catch {}
   }
 
-  async function reviewScript(rewrite = false) {
+  async function inspectCurrentStudio() {
+    if (!result.trim()) {
+      setStatus("AI Studio chưa có nội dung để kiểm định.");
+      return;
+    }
+    try {
+      const data = await callAI("inspector", { input: result });
+      setLastInspectionScores(data.scores || null);
+      setReviewInput(result);
+      setReviewResult(data.text || "");
+      setScores(data.scores || null);
+      setStatus("Đã kiểm định nhanh kịch bản hiện tại.");
+    } catch {}
+  }
+
+  async function inspectScript() {
     if (!reviewInput.trim()) return;
     try {
-      const data = await callAI(rewrite ? "rewrite" : "review", {
-        input: reviewInput,
-      });
+      const data = await callAI("inspector", { input: reviewInput });
       setReviewResult(data.text);
       if (data.scores) setScores(data.scores);
     } catch {}
+  }
+
+  async function fixFromInspector() {
+    if (!reviewInput.trim()) return;
+    try {
+      const data = await callAI("inspector_fix", {
+        input: reviewInput,
+        analysis: reviewResult,
+      });
+      if (data.text) {
+        addVersion(result, "Trước khi sửa theo AI Inspector");
+        setResult(data.text);
+        setReviewInput(data.text);
+        setPage("studio");
+        setStatus("Đã sửa theo AI Inspector.");
+      }
+    } catch {}
+  }
+
+  async function trainAIStyle() {
+    if (!trainerInput.trim()) return;
+    setTrainerLoading(true);
+    try {
+      const examples = trainerInput.split(/\n\s*\n/).map((item) => item.trim()).filter(Boolean).slice(0, 40);
+      const data = await callAI("trainer", {
+        input: trainerInput,
+        trainerExamples: examples,
+        feedbackMemory: studioFeedbackMemory.slice(0, 60),
+        copiedExamples: learningExamples.slice(0, 40),
+      });
+      setTrainerAnalysis(data.analysis || null);
+
+      const learned: LearningExample[] = examples.map((content, index) => {
+        const firstLine = content.split(/\n+/).find(Boolean)?.trim() || content.slice(0, 120);
+        return {
+          id: makeId(),
+          content,
+          title: `Trainer mẫu ${index + 1}`,
+          theme: "AI Trainer",
+          copiedAt: today(),
+          copyCount: 4,
+          source: "studio",
+          signals: {
+            opening: firstLine.slice(0, 180),
+            hasDialogue: /["“”]|:\s*["“]/.test(content),
+            hasAudioTags: /\[[a-zA-Z]+\]/.test(content),
+            approximateWords: content.split(/\s+/).filter(Boolean).length,
+          },
+        };
+      });
+      setLearningExamples((items) => [...learned, ...items].slice(0, 160));
+      setStatus(`AI Trainer đã học ${examples.length} mẫu.`);
+    } catch {
+    } finally {
+      setTrainerLoading(false);
+    }
   }
 
   function scoreCommunityQuestion(text: string) {
@@ -1621,7 +1720,7 @@ export default function Home() {
           </div>
           <div className="brand-copy">
             <strong>CONTENT UNIVERSE</strong>
-            <small>Siêu Di Động · V26</small>
+            <small>Siêu Di Động · V28</small>
           </div>
           <button
             className="mobile-drawer-close"
@@ -1690,21 +1789,21 @@ export default function Home() {
                   </div>
                   <h2>Một ý tưởng nhỏ.<br />Năm phiên bản đủ mạnh để chọn.</h2>
                   <p>
-                    V23 giúp Content Universe học từ những kịch bản bạn đã Copy:
-                    viết, trò chuyện, chấm điểm, lưu trữ và tối ưu trong một nơi.
+                    V27 giúp Content Universe học từ kịch bản đã Copy, góp ý và bài chuẩn:
+                    AI Studio tạo nội dung, AI Trainer học gu viết và AI Inspector kiểm định trước khi đăng.
                   </p>
                   <div className="hero-buttons">
                     <button className="yellow" onClick={() => setPage("studio")}>✦ Bắt đầu viết</button>
-                    <button className="dark-ghost" onClick={() => setPage("chat")}>◌ Mở AI Chat</button>
+                    <button className="dark-ghost" onClick={() => setPage("trainer")}>◆ Mở AI Trainer</button>
                   </div>
                 </div>
                 <div className="hero-visual">
-                  <div className="core">V22.2</div>
+                  <div className="core">V27</div>
                   <div className="ring ring-a" />
                   <div className="ring ring-b" />
                   <span className="chip chip-a">HOOK</span>
                   <span className="chip chip-b">STORY</span>
-                  <span className="chip chip-c">REVIEW</span>
+                  <span className="chip chip-c">INSPECT</span>
                 </div>
               </section>
 
@@ -1724,7 +1823,23 @@ export default function Home() {
               </div>
 
               <div className="dashboard-grid">
-                <section className="panel">
+  
+              <section className="ai-brain-dashboard-v28">
+                <div>
+                  <span className="eyebrow">AI BRAIN · V28</span>
+                  <h3>AI đang học theo cách bạn chọn nội dung.</h3>
+                  <p>Copy, góp ý, bài chuẩn và Trainer đều trở thành tín hiệu cho lần viết tiếp theo.</p>
+                </div>
+                <div className="brain-metrics-v28">
+                  <article><b>{learningExamples.length}</b><span>Mẫu học</span></article>
+                  <article><b>{studioFeedbackMemory.length}</b><span>Feedback</span></article>
+                  <article><b>{communityCopiedExamples.length}</b><span>Community Copy</span></article>
+                  <article className={adaptiveLearning ? "active" : ""}><b>{adaptiveLearning ? "ON" : "OFF"}</b><span>Adaptive</span></article>
+                </div>
+                <button className="dark-ghost" onClick={() => setPage("trainer")}>Mở AI Trainer →</button>
+              </section>
+
+              <section className="panel">
                   <div className="panel-head">
                     <div>
                       <span className="eyebrow">CHỦ ĐỀ</span>
@@ -1961,6 +2076,95 @@ export default function Home() {
                   <button className="secondary" disabled={!idea.trim()} onClick={generateHooks}>Tạo 20 Hook</button>
                   <span>{status}</span>
                 </div>
+
+                <div className="studio-adaptive-v28">
+                  <div className="adaptive-toggle-v28">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={adaptiveLearning}
+                        onChange={(event) => setAdaptiveLearning(event.target.checked)}
+                      />
+                      <span>
+                        <strong>Adaptive Learning</strong>
+                        <small>Tự áp dụng Style DNA, bài đã Copy và feedback vào lần viết tiếp theo.</small>
+                      </span>
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={autoInspect}
+                        onChange={(event) => setAutoInspect(event.target.checked)}
+                      />
+                      <span>
+                        <strong>Tự kiểm định sau khi viết</strong>
+                        <small>AI Inspector chấm ngầm sau mỗi lần tạo kịch bản.</small>
+                      </span>
+                    </label>
+                  </div>
+
+                  {lastInspectionScores && (
+                    <div className="studio-mini-inspector-v28">
+                      <span>Inspector</span>
+                      <b>{lastInspectionScores.overall}/10</b>
+                      <small>
+                        Tự nhiên {lastInspectionScores.natural}/10 · Viral {lastInspectionScores.viral}/10 · Giống AI {Math.round(lastInspectionScores.aiLike * 10)}%
+                      </small>
+                      <button onClick={() => setPage("inspector")}>Xem chi tiết →</button>
+                    </div>
+                  )}
+                </div>
+
+                {result.trim() && (
+                  <section className="studio-feedback-card">
+                    <div className="studio-feedback-head">
+                      <div>
+                        <span className="eyebrow">AI FEEDBACK · V28</span>
+                        <h3>Sửa kết quả theo góp ý</h3>
+                        <p>Không ưng kết quả? Góp ý ngay tại đây để AI sửa lại, không cần tạo bài mới.</p>
+                      </div>
+                      <div className="studio-rating" aria-label="Đánh giá kết quả">
+                        {[1,2,3,4,5].map((star) => (
+                          <button
+                            key={star}
+                            className={studioRating >= star ? "active" : ""}
+                            onClick={() => setStudioRating(star)}
+                            title={`${star} sao`}
+                          >★</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="studio-feedback-chips">
+                      {studioQuickFeedback.map((tag) => (
+                        <button
+                          key={tag}
+                          className={studioFeedbackTags.includes(tag) ? "active" : ""}
+                          onClick={() => toggleStudioFeedbackTag(tag)}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="studio-feedback-compose">
+                      <textarea
+                        value={studioFeedbackText}
+                        onChange={(event) => setStudioFeedbackText(event.target.value)}
+                        placeholder='Ví dụ: "hook chưa đủ sốc, đoạn giữa dài quá, bớt quảng cáo và kể giống khách thật hơn"'
+                      />
+                      <button className="primary" onClick={refineStudioResult} disabled={studioRefining}>
+                        {studioRefining ? "AI đang sửa..." : "✦ AI sửa theo góp ý"}
+                      </button>
+                    </div>
+
+                    <div className="studio-feedback-actions">
+                      <button className="secondary" onClick={copyStudioResult}>⧉ Copy & học</button>
+                      <button className="secondary" onClick={saveStudioAsTemplate}>★ Lưu làm bài chuẩn</button>
+                      <span>AI Memory: {studioFeedbackMemory.length} phản hồi · {learningExamples.length} mẫu học</span>
+                    </div>
+                  </section>
+                )}
               </section>
 
               <section className="editor panel">
@@ -1971,6 +2175,7 @@ export default function Home() {
                   </div>
                   <div>
                     <button onClick={() => copyText(result, { source: "studio", title, theme })}>Sao chép</button>
+                    <button onClick={inspectCurrentStudio}>◎ Kiểm định</button>
                     <button onClick={() => downloadText("txt")}>TXT</button>
                     <button onClick={() => downloadText("md")}>MD</button>
                     <button className="save" onClick={saveScript}>Lưu</button>
@@ -2027,156 +2232,155 @@ export default function Home() {
                 </details>
               </section>
 
-                {result.trim() && (
-                  <section className="studio-feedback-card">
-                    <div className="studio-feedback-head">
-                      <div>
-                        <span className="eyebrow">AI FEEDBACK · V26</span>
-                        <h3>Góp ý để AI sửa lại kết quả</h3>
-                        <p>Chọn nhanh hoặc nhập góp ý. Copy và lưu bài chuẩn sẽ được dùng làm tín hiệu học cho những lần sau.</p>
-                      </div>
-                      <div className="studio-rating" aria-label="Đánh giá kết quả">
-                        {[1,2,3,4,5].map((star) => (
-                          <button
-                            key={star}
-                            className={studioRating >= star ? "active" : ""}
-                            onClick={() => setStudioRating(star)}
-                            title={`${star} sao`}
-                          >★</button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="studio-feedback-chips">
-                      {studioQuickFeedback.map((tag) => (
-                        <button
-                          key={tag}
-                          className={studioFeedbackTags.includes(tag) ? "active" : ""}
-                          onClick={() => toggleStudioFeedbackTag(tag)}
-                        >
-                          {tag}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="studio-feedback-compose">
-                      <textarea
-                        value={studioFeedbackText}
-                        onChange={(event) => setStudioFeedbackText(event.target.value)}
-                        placeholder='Ví dụ: "hook chưa đủ sốc, đoạn giữa dài quá, bớt quảng cáo và kể giống khách thật hơn"'
-                      />
-                      <button className="primary" onClick={refineStudioResult} disabled={studioRefining}>
-                        {studioRefining ? "AI đang sửa..." : "✦ AI sửa theo góp ý"}
-                      </button>
-                    </div>
-
-                    <div className="studio-feedback-actions">
-                      <button className="secondary" onClick={copyStudioResult}>⧉ Copy & học</button>
-                      <button className="secondary" onClick={saveStudioAsTemplate}>★ Lưu làm bài chuẩn</button>
-                      <span>AI Memory: {studioFeedbackMemory.length} phản hồi · {learningExamples.length} mẫu học</span>
-                    </div>
-                  </section>
-                )}
 
             </div>
           )}
 
-          {page === "chat" && (
-            <div className="chat-layout">
-              <section className="chat-panel">
-                <div className="chat-head">
-                  <div className="chat-avatar">AI</div>
-                  <div>
-                    <strong>Content Assistant</strong>
-                    <small><span className="online-dot" /> Gemini · Trực tuyến</small>
-                  </div>
-                  <button onClick={() => setMessages([])}>Xóa cuộc trò chuyện</button>
+          {page === "trainer" && (
+            <div className="trainer-v27">
+              <section className="trainer-hero-v27">
+                <div>
+                  <span className="eyebrow">AI TRAINER · V28</span>
+                  <h2>Dạy AI viết đúng gu của bạn.</h2>
+                  <p>Dán những bài bạn thấy hay. AI rút ra quy tắc, Style DNA và đưa mẫu tốt vào bộ nhớ dùng cho AI Studio.</p>
                 </div>
-
-                <div className="messages">
-                  {messages.map((message) => (
-                    <div key={message.id} className={`message ${message.role}`}>
-                      <div className="message-avatar">{message.role === "user" ? "Bạn" : "AI"}</div>
-                      <div className="bubble">{message.content}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="chat-composer">
-                  <textarea
-                    value={chatInput}
-                    onChange={(event) => setChatInput(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter" && !event.shiftKey) {
-                        event.preventDefault();
-                        sendChat();
-                      }
-                    }}
-                    placeholder="Ví dụ: Viết lại hook này gây sốc hơn, nhưng đừng chê khách nghèo..."
-                  />
-                  <button onClick={sendChat}>Gửi ↗</button>
+                <div className="trainer-brain-v27 trainer-brain-v28">
+                  <strong>{learningExamples.length + studioFeedbackMemory.length}</strong>
+                  <span>Tín hiệu đã học</span>
+                  <em className={adaptiveLearning ? "on" : "off"}>{adaptiveLearning ? "Adaptive ON" : "Adaptive OFF"}</em>
                 </div>
               </section>
 
-              <aside className="chat-side panel">
-                <span className="eyebrow">LỆNH NHANH</span>
-                <h3>Sửa kịch bản bằng hội thoại</h3>
-                {[
-                  "Cho hài hơn nhưng vẫn hợp lý",
-                  "Rút ngắn khoảng 20%",
-                  "Thêm audio tag Adam V3",
-                  "Viết hook rõ lý do hơn",
-                  "Tạo một twist khác hoàn toàn",
-                ].map((item) => (
-                  <button key={item} onClick={() => setChatInput(item)}>{item}</button>
-                ))}
-                <div className="tip">
-                  <strong>Mẹo</strong>
-                  <p>Dán cả kịch bản vào chat rồi tiếp tục yêu cầu chỉnh từng phần. AI sẽ giữ ngữ cảnh các tin nhắn gần nhất.</p>
-                </div>
-              </aside>
+              <div className="trainer-layout-v27">
+                <section className="panel trainer-input-v27">
+                  <div className="panel-head">
+                    <div><span className="eyebrow">DỮ LIỆU HUẤN LUYỆN</span><h3>Nạp bài mẫu</h3></div>
+                    <span>{trainerInput.split(/\n\s*\n/).filter(Boolean).length} mẫu</span>
+                  </div>
+                  <p>Mỗi bài cách nhau bằng một dòng trống. Nên dùng những bài bạn thực sự muốn AI học theo.</p>
+                  <textarea
+                    value={trainerInput}
+                    onChange={(event) => setTrainerInput(event.target.value)}
+                    placeholder={"Dán bài mẫu 1...\n\nDán bài mẫu 2...\n\nDán bài mẫu 3..."}
+                  />
+                  <button className="primary trainer-button-v27" disabled={!trainerInput.trim() || trainerLoading} onClick={trainAIStyle}>
+                    {trainerLoading ? "AI đang phân tích..." : "◆ Phân tích & cho AI học"}
+                  </button>
+                  <label className="trainer-adaptive-switch-v28">
+                    <input type="checkbox" checked={adaptiveLearning} onChange={(e) => setAdaptiveLearning(e.target.checked)} />
+                    <span>Dùng Style DNA này tự động trong AI Studio</span>
+                  </label>
+                </section>
+
+                <section className="trainer-output-v27">
+                  <div className="trainer-stats-v27">
+                    <article><b>{learningExamples.length}</b><span>Bài/mẫu học</span></article>
+                    <article><b>{studioFeedbackMemory.length}</b><span>Feedback</span></article>
+                    <article><b>{studioFeedbackMemory.filter((item) => item.copied).length}</b><span>Bài đã Copy</span></article>
+                    <article><b>{studioFeedbackMemory.filter((item) => item.savedAsTemplate).length}</b><span>Bài chuẩn</span></article>
+                  </div>
+
+                  <div className="panel trainer-analysis-v27">
+                    <div className="panel-head">
+                      <div><span className="eyebrow">STYLE DNA</span><h3>AI đã hiểu gì?</h3></div>
+                    </div>
+                    {trainerAnalysis ? (
+                      <>
+                        <p className="trainer-summary-v27">{trainerAnalysis.summary}</p>
+                        <div className="trainer-dna-v27">
+                          {[
+                            ["Hook", trainerAnalysis.dna?.hook],
+                            ["Kể chuyện", trainerAnalysis.dna?.storytelling],
+                            ["Đời thường", trainerAnalysis.dna?.natural],
+                            ["Twist", trainerAnalysis.dna?.twist],
+                            ["Bán hàng mềm", trainerAnalysis.dna?.salesSoftness],
+                          ].map(([label, value]) => (
+                            <div key={String(label)}>
+                              <span>{label}</span><strong>{Number(value || 0)}%</strong>
+                              <i><b style={{width:`${Number(value || 0)}%`}} /></i>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="trainer-rules-v27">
+                          <strong>Quy tắc AI vừa học</strong>
+                          {(trainerAnalysis.rules || []).map((rule, index) => <p key={index}>✓ {rule}</p>)}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="trainer-empty-v27">
+                        <b>Chưa có phân tích mới.</b>
+                        <p>Nạp các bài mẫu bên trái rồi bấm “Phân tích & cho AI học”.</p>
+                      </div>
+                    )}
+                  </div>
+                </section>
+              </div>
             </div>
           )}
 
-          {page === "review" && (
-            <div className="review-layout">
-              <section className="panel review-input">
-                <span className="eyebrow">AI REVIEW</span>
-                <h2>Chấm điểm trước khi đăng.</h2>
+          {page === "inspector" && (
+            <div className="inspector-v27">
+              <section className="panel inspector-input-v27">
+                <div className="v27-section-head">
+                  <div>
+                    <span className="eyebrow">AI INSPECTOR · V28</span>
+                    <h2>Kiểm định trước khi đăng.</h2>
+                    <p>Dán kịch bản hoặc lấy thẳng bài đang viết trong AI Studio.</p>
+                  </div>
+                  <button
+                    className="secondary"
+                    onClick={() => {
+                      setReviewInput(result);
+                      setStatus(result.trim() ? "Đã lấy kịch bản từ AI Studio." : "AI Studio chưa có nội dung.");
+                    }}
+                  >
+                    ← Lấy bài AI Studio
+                  </button>
+                </div>
                 <textarea
                   value={reviewInput}
                   onChange={(event) => setReviewInput(event.target.value)}
-                  placeholder="Dán kịch bản TikTok vào đây..."
+                  placeholder="Dán kịch bản cần kiểm định..."
                 />
-                <div>
-                  <button className="primary" onClick={() => reviewScript(false)}>◎ Chấm điểm</button>
-                  <button className="secondary" onClick={() => reviewScript(true)}>✦ Viết lại</button>
+                <div className="inspector-actions-v27">
+                  <button className="primary" disabled={!reviewInput.trim()} onClick={inspectScript}>◎ Kiểm định</button>
+                  <button className="secondary" disabled={!reviewInput.trim() || !reviewResult.trim()} onClick={fixFromInspector}>✦ Sửa theo Inspector</button>
                 </div>
               </section>
 
-              <section className="review-output">
-                <div className="score-grid">
+              <section className="inspector-output-v27">
+                <div className="inspector-score-grid-v27">
                   {[
-                    ["Hook", scores?.hook],
-                    ["Drama", scores?.drama],
-                    ["Twist", scores?.twist],
-                    ["Giữ chân", scores?.retention],
-                    ["Tự nhiên", scores?.natural],
-                    ["Tổng", scores?.overall],
-                  ].map(([label, value]) => (
-                    <article key={String(label)}>
+                    ["Hook", scores?.hook, "score"],
+                    ["Twist", scores?.twist, "score"],
+                    ["Giữ chân", scores?.retention, "score"],
+                    ["Tự nhiên", scores?.natural, "score"],
+                    ["Logic", scores?.logic, "score"],
+                    ["Viral", scores?.viral, "score"],
+                    ["Giống AI", scores?.aiLike, "risk"],
+                    ["Quảng cáo", scores?.adRisk, "risk"],
+                    ["Tổng", scores?.overall, "score"],
+                  ].map(([label, value, kind]) => (
+                    <article key={String(label)} className={kind === "risk" ? "risk" : ""}>
                       <span>{label}</span>
-                      <strong>{typeof value === "number" ? `${value}/10` : "—"}</strong>
+                      <strong>
+                        {typeof value === "number"
+                          ? kind === "risk" ? `${Math.round(value * 10)}%` : `${value}/10`
+                          : "—"}
+                      </strong>
                       <div><b style={{ width: `${Number(value || 0) * 10}%` }} /></div>
                     </article>
                   ))}
                 </div>
-                <div className="panel review-text">
+
+                <div className="panel inspector-analysis-v27">
                   <div className="panel-head">
-                    <div><span className="eyebrow">PHÂN TÍCH</span><h3>Đề xuất của Gemini</h3></div>
-                    <button onClick={() => copyText(reviewResult, { source: "review", title: "Bản viết lại từ AI Review", theme })}>Sao chép</button>
+                    <div><span className="eyebrow">PHÂN TÍCH</span><h3>AI Inspector</h3></div>
+                    <button className="secondary" disabled={!reviewResult.trim()} onClick={() => copyText(reviewResult)}>Sao chép</button>
                   </div>
-                  <textarea value={reviewResult} onChange={(event) => setReviewResult(event.target.value)} />
+                  <div className="inspector-analysis-text-v27">
+                    {reviewResult || "Kết quả kiểm định sẽ xuất hiện ở đây."}
+                  </div>
                 </div>
               </section>
             </div>
