@@ -79,6 +79,19 @@ type LearningExample = {
 };
 
 
+type StudioFeedbackMemory = {
+  id: string;
+  createdAt: string;
+  prompt: string;
+  original: string;
+  final: string;
+  rating: number;
+  feedback: string[];
+  copied: boolean;
+  savedAsTemplate: boolean;
+};
+
+
 type CommunityQuestion = {
   id: string;
   text: string;
@@ -603,6 +616,11 @@ export default function Home() {
   const [promptOutput, setPromptOutput] = useState("");
   const [knowledge, setKnowledge] = useState<KnowledgeBase>(defaultKnowledge);
   const [learningExamples, setLearningExamples] = useState<LearningExample[]>([]);
+  const [studioFeedbackText, setStudioFeedbackText] = useState("");
+  const [studioFeedbackTags, setStudioFeedbackTags] = useState<string[]>([]);
+  const [studioRating, setStudioRating] = useState(0);
+  const [studioRefining, setStudioRefining] = useState(false);
+  const [studioFeedbackMemory, setStudioFeedbackMemory] = useState<StudioFeedbackMemory[]>([]);
   const [communityExamples, setCommunityExamples] = useState(defaultCommunityExamples);
   const [communityCopiedExamples, setCommunityCopiedExamples] = useState<string[]>([]);
   const [communitySettings, setCommunitySettings] = useState<CommunitySettings>(defaultCommunitySettings);
@@ -710,7 +728,7 @@ export default function Home() {
       selectedPromptId, messages, knowledge, versionsHistory, buyerType,
       customBuyerType, companion, customCompanion, location, hookSpeaker,
       customHookSpeaker, openingEmotion, theme, formulaId, versions, scriptLength,
-      idea, result, title, learningExamples, communityExamples, communityCopiedExamples, communitySettings, communityQuestions,
+      idea, result, title, learningExamples, studioFeedbackMemory, communityExamples, communityCopiedExamples, communitySettings, communityQuestions,
     };
   }
 
@@ -1218,6 +1236,104 @@ export default function Home() {
     }
   }
 
+  const studioQuickFeedback = [
+    "Hook yếu",
+    "Quá dài",
+    "Quá ngắn",
+    "Giống AI",
+    "Giống quảng cáo",
+    "Thiếu twist",
+    "Thiếu cảm xúc",
+    "Chưa tự nhiên",
+    "Ngắn gọn hơn",
+    "Bình dân hơn",
+    "Hay rồi",
+  ];
+
+  function toggleStudioFeedbackTag(tag: string) {
+    setStudioFeedbackTags((items) =>
+      items.includes(tag) ? items.filter((item) => item !== tag) : [...items, tag]
+    );
+  }
+
+  function saveStudioFeedbackMemory(finalText: string, extra?: Partial<StudioFeedbackMemory>) {
+    if (!result.trim()) return;
+    const memory: StudioFeedbackMemory = {
+      id: makeId(),
+      createdAt: today(),
+      prompt: idea,
+      original: result,
+      final: finalText || result,
+      rating: studioRating,
+      feedback: [...studioFeedbackTags, ...(studioFeedbackText.trim() ? [studioFeedbackText.trim()] : [])],
+      copied: false,
+      savedAsTemplate: false,
+      ...extra,
+    };
+    setStudioFeedbackMemory((items) => [memory, ...items].slice(0, 250));
+  }
+
+  async function refineStudioResult() {
+    if (!result.trim()) {
+      setStatus("Chưa có kết quả AI để sửa.");
+      return;
+    }
+    const feedback = [...studioFeedbackTags, studioFeedbackText.trim()].filter(Boolean);
+    if (!feedback.length) {
+      setStatus("Hãy chọn góp ý nhanh hoặc nhập góp ý cho AI.");
+      return;
+    }
+    setStudioRefining(true);
+    try {
+      const data = await callAI("studio_refine", {
+        original: result,
+        idea,
+        title,
+        feedback,
+        rating: studioRating,
+        learningExamples: learningExamples.slice(0, 12),
+        studioFeedbackMemory: studioFeedbackMemory.slice(0, 30),
+      });
+      const revised = String(data.text || "").trim();
+      if (revised) {
+        saveStudioFeedbackMemory(revised);
+        setResult(revised);
+        setStudioFeedbackText("");
+        setStudioFeedbackTags([]);
+        setStatus("AI đã sửa lại theo góp ý.");
+      }
+    } catch {
+    } finally {
+      setStudioRefining(false);
+    }
+  }
+
+  async function copyStudioResult() {
+    if (!result.trim()) return;
+    await navigator.clipboard.writeText(result);
+    saveStudioFeedbackMemory(result, { copied: true, rating: Math.max(studioRating, 4) });
+    learnFromCopy(result, title || "AI Studio", theme || "AI Studio", "studio");
+    setStatus("Đã sao chép · AI ghi nhận đây là kết quả đạt.");
+  }
+
+  function saveStudioAsTemplate() {
+    if (!result.trim()) return;
+    const signals = analyzeLearningSignals(result);
+    const item: LearningExample = {
+      id: makeId(),
+      content: result,
+      title: title || "Bài chuẩn AI Studio",
+      theme: theme || "AI Studio",
+      copiedAt: today(),
+      copyCount: 5,
+      source: "studio",
+      signals,
+    };
+    setLearningExamples((items) => [item, ...items].slice(0, 120));
+    saveStudioFeedbackMemory(result, { savedAsTemplate: true, rating: Math.max(studioRating, 5) });
+    setStatus("Đã lưu làm bài chuẩn. AI sẽ ưu tiên học theo mẫu này.");
+  }
+
   async function sendChat() {
     const text = chatInput.trim();
     if (!text) return;
@@ -1495,7 +1611,7 @@ export default function Home() {
           </div>
           <div className="brand-copy">
             <strong>CONTENT UNIVERSE</strong>
-            <small>Siêu Di Động · V25</small>
+            <small>Siêu Di Động · V26</small>
           </div>
           <button
             className="mobile-drawer-close"
@@ -1957,6 +2073,60 @@ export default function Home() {
                   <p>Dán cả kịch bản vào chat rồi tiếp tục yêu cầu chỉnh từng phần. AI sẽ giữ ngữ cảnh các tin nhắn gần nhất.</p>
                 </div>
               </aside>
+
+                {result.trim() && (
+                  <section className="studio-feedback-card">
+                    <div className="studio-feedback-head">
+                      <div>
+                        <span className="eyebrow">AI FEEDBACK · V26</span>
+                        <h3>Huấn luyện AI từ kết quả này</h3>
+                        <p>Góp ý trực tiếp để AI sửa lại. Những lần Copy, chấm sao và lưu bài chuẩn sẽ được dùng làm tín hiệu học.</p>
+                      </div>
+                      <div className="studio-rating" aria-label="Đánh giá kết quả">
+                        {[1,2,3,4,5].map((star) => (
+                          <button
+                            key={star}
+                            className={studioRating >= star ? "active" : ""}
+                            onClick={() => setStudioRating(star)}
+                            title={`${star} sao`}
+                          >★</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="studio-feedback-chips">
+                      {studioQuickFeedback.map((tag) => (
+                        <button
+                          key={tag}
+                          className={studioFeedbackTags.includes(tag) ? "active" : ""}
+                          onClick={() => toggleStudioFeedbackTag(tag)}
+                        >
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="studio-feedback-compose">
+                      <textarea
+                        value={studioFeedbackText}
+                        onChange={(event) => setStudioFeedbackText(event.target.value)}
+                        placeholder='Ví dụ: "hook chưa đủ sốc, đoạn giữa dài quá, bỏ giọng quảng cáo và kể giống khách thật hơn"'
+                      />
+                      <button className="primary" onClick={refineStudioResult} disabled={studioRefining}>
+                        {studioRefining ? "AI đang sửa..." : "✦ AI sửa theo góp ý"}
+                      </button>
+                    </div>
+
+                    <div className="studio-feedback-actions">
+                      <button className="secondary" onClick={copyStudioResult}>⧉ Copy & học</button>
+                      <button className="secondary" onClick={saveStudioAsTemplate}>★ Lưu làm bài chuẩn</button>
+                      <span>
+                        AI Memory: {studioFeedbackMemory.length} phản hồi · {learningExamples.length} mẫu học
+                      </span>
+                    </div>
+                  </section>
+                )}
+
             </div>
           )}
 

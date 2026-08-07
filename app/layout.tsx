@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Content Universe V25 – Siêu Di Động",
+  title: "Content Universe V26 – Siêu Di Động",
   description: "Hệ điều hành AI của Siêu Di Động · Thiết kế và phát triển bởi Nguyễn Khánh Hải",
   icons: {
     icon: "/favicon.png",

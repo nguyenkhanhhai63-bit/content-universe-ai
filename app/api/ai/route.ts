@@ -105,6 +105,12 @@ export async function POST(request: Request) {
     const existingQuestions = Array.isArray(body?.existingQuestions) ? body.existingQuestions.slice(0, 120) : [];
     const communityFeedback = String(body?.feedback || "");
     const communityQuestionsInput = Array.isArray(body?.questions) ? body.questions.slice(0, 80) : [];
+    const studioOriginal = String(body?.original || "");
+    const studioIdea = String(body?.idea || "");
+    const studioTitle = String(body?.title || "");
+    const studioFeedback = Array.isArray(body?.feedback) ? body.feedback.slice(0, 20) : [];
+    const studioRatingInput = Number(body?.rating || 0);
+    const studioFeedbackMemoryInput = Array.isArray(body?.studioFeedbackMemory) ? body.studioFeedbackMemory.slice(0, 30) : [];
 
     const renderTemplate = (template: string) =>
       template
@@ -126,7 +132,7 @@ export async function POST(request: Request) {
 
 ${templateSystemPrompt}
 
-Bạn đang vận hành Content Universe V25.
+Bạn đang vận hành Content Universe V26.
 Bạn là trợ lý content làm việc lâu năm tại Siêu Di Động.
 Kết quả phải viết bằng tiếng Việt tự nhiên và có thể đọc thẳng bằng giọng Adam ElevenLabs V3.
 Không thêm lời dẫn kiểu "Dưới đây là".
@@ -143,7 +149,37 @@ Hãy học nhịp kể, độ dài câu, cấu trúc hook, mâu thuẫn, twist v
     let prompt = "";
     let jsonMode = false;
 
-    if (mode === "community_refine") {
+    if (mode === "studio_refine") {
+      prompt = `Bạn là biên tập viên nội dung của Siêu Di Động.
+
+NỘI DUNG HIỆN TẠI:
+${studioOriginal}
+
+Ý TƯỞNG BAN ĐẦU:
+${studioIdea}
+
+TIÊU ĐỀ:
+${studioTitle}
+
+ĐÁNH GIÁ CỦA NGƯỜI DÙNG:
+${studioRatingInput ? `${studioRatingInput}/5 sao` : "chưa chấm"}
+
+GÓP Ý CẦN SỬA:
+${studioFeedback.length ? studioFeedback.map((item: string) => `- ${item}`).join("\n") : "- Sửa tự nhiên hơn"}
+
+MEMORY TỪ CÁC LẦN GÓP Ý TRƯỚC:
+${studioFeedbackMemoryInput.length ? studioFeedbackMemoryInput.map((item: any) => `- ${Array.isArray(item.feedback) ? item.feedback.join(", ") : ""}`).filter(Boolean).join("\n") : "(chưa có)"}
+
+YÊU CẦU:
+- Viết lại trực tiếp nội dung hiện tại theo đúng góp ý.
+- Giữ chất kể chuyện tự nhiên của Siêu Di Động.
+- Không viết kiểu MC, quảng cáo cứng hoặc review khô.
+- Nếu người dùng bảo ngắn hơn thì phải cắt thật sự; nếu bảo hook mạnh hơn thì thay hook rõ rệt.
+- Nếu bảo giống AI/quảng cáo thì giảm câu trau chuốt, tăng nhịp kể đời thường.
+- Giữ Audio Tags nếu nội dung hiện tại đang dùng.
+- Không giải thích quá trình chỉnh sửa.
+- Chỉ trả về nội dung đã sửa.`;
+    } else if (mode === "community_refine") {
       jsonMode = true;
       prompt = `Bạn đang chỉnh sửa một danh sách câu hỏi mua điện thoại dạng cộng đồng.
 
