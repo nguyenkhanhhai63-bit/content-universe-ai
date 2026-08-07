@@ -1,6 +1,6 @@
 {
-  "name": "content-universe-v23-community-ai",
-  "version": "23.0.0",
+  "name": "content-universe-v25-community-feedback",
+  "version": "25.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

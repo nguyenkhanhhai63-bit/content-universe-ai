@@ -102,6 +102,9 @@ export async function POST(request: Request) {
     const communityExamples = String(body?.communityExamples || "");
     const communityCopiedExamples = Array.isArray(body?.communityCopiedExamples) ? body.communityCopiedExamples.slice(0, 80) : [];
     const communitySettings = body?.communitySettings || {};
+    const existingQuestions = Array.isArray(body?.existingQuestions) ? body.existingQuestions.slice(0, 120) : [];
+    const communityFeedback = String(body?.feedback || "");
+    const communityQuestionsInput = Array.isArray(body?.questions) ? body.questions.slice(0, 80) : [];
 
     const renderTemplate = (template: string) =>
       template
@@ -123,7 +126,7 @@ export async function POST(request: Request) {
 
 ${templateSystemPrompt}
 
-Bạn đang vận hành Content Universe V23.
+Bạn đang vận hành Content Universe V25.
 Bạn là trợ lý content làm việc lâu năm tại Siêu Di Động.
 Kết quả phải viết bằng tiếng Việt tự nhiên và có thể đọc thẳng bằng giọng Adam ElevenLabs V3.
 Không thêm lời dẫn kiểu "Dưới đây là".
@@ -140,7 +143,32 @@ Hãy học nhịp kể, độ dài câu, cấu trúc hook, mâu thuẫn, twist v
     let prompt = "";
     let jsonMode = false;
 
-    if (mode === "community") {
+    if (mode === "community_refine") {
+      jsonMode = true;
+      prompt = `Bạn đang chỉnh sửa một danh sách câu hỏi mua điện thoại dạng cộng đồng.
+
+DANH SÁCH HIỆN TẠI:
+${communityQuestionsInput.map((item: string, index: number) => `${index + 1}. ${item}`).join("\n")}
+
+GÓP Ý CỦA NGƯỜI DÙNG:
+${communityFeedback || "(không có)"}
+
+CÂU MẪU DÙNG ĐỂ HỌC PHONG CÁCH:
+${communityExamples || "(chưa có mẫu)"}
+
+CÂU ĐÃ COPY VÀ ĐƯỢC XEM LÀ ĐẠT:
+${communityCopiedExamples.length ? communityCopiedExamples.map((item: string, index: number) => `${index + 1}. ${item}`).join("\n") : "(chưa có)"}
+
+YÊU CẦU:
+- Sửa TOÀN BỘ danh sách theo đúng góp ý, nhưng giữ tinh thần câu hỏi tự nhiên như người thật trong group điện thoại.
+- Không viết quá chỉnh chu; có thể lược chủ ngữ, viết tắt vừa phải, câu ngắn hoặc xuống dòng tự nhiên.
+- Nếu góp ý nói "ngắn hơn", "đời hơn", "ưu tiên iPhone", "ít viết tắt", "thêm câu hỏi giá", v.v. thì phải áp dụng rõ ràng.
+- Không sao chép nguyên văn câu mẫu.
+- Không biến câu hỏi thành quảng cáo, review giả hay lời khen cửa hàng.
+- Giữ số lượng câu gần bằng danh sách gốc, trừ khi góp ý yêu cầu khác.
+- Chỉ trả JSON hợp lệ:
+{"questions":["câu 1","câu 2"]}`;
+    } else if (mode === "community") {
       jsonMode = true;
       const quantity = Math.max(1, Math.min(50, Number(communitySettings?.quantity) || 12));
       const iphoneWeight = Math.max(0, Math.min(100, Number(communitySettings?.iphoneWeight) || 70));
@@ -180,6 +208,10 @@ QUY TẮC QUAN TRỌNG:
 - Không nhồi "mọi người ơi", "các bác ơi", "anh em ơi" vào tất cả câu.
 - Không dùng văn quảng cáo, không tự khen Siêu Di Động, không chèn tên cửa hàng trừ khi câu hỏi có nhu cầu địa phương hợp lý.
 - Không lặp y hệt câu mẫu. Học nhịp câu và từ vựng, rồi tạo câu mới.
+- Tránh lặp hoặc tạo câu quá giống danh sách câu đã sinh gần đây.
+
+CÂU ĐÃ SINH GẦN ĐÂY:
+${existingQuestions.length ? existingQuestions.map((item: string) => `- ${item}`).join("\n") : "(chưa có)"}
 - Không đánh số trong nội dung câu.
 - Chỉ trả về JSON hợp lệ theo dạng:
 {"questions":["câu 1","câu 2"]}`;
@@ -355,7 +387,7 @@ ${labels.map((label) => `PHIÊN BẢN ${label}`).join("\n")}`
 
     if (lastError || !text) throw lastError || new Error("Không tìm thấy model Gemini phù hợp.");
 
-    if (mode === "community") {
+    if (mode === "community" || mode === "community_refine") {
       try {
         const parsed = JSON.parse(stripJson(text));
         const questions = Array.isArray(parsed?.questions)

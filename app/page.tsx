@@ -84,6 +84,10 @@ type CommunityQuestion = {
   text: string;
   createdAt: string;
   copied: boolean;
+  favorite: boolean;
+  naturalScore: number;
+  tags: string[];
+  copyCount: number;
 };
 
 type CommunitySettings = {
@@ -94,6 +98,8 @@ type CommunitySettings = {
   intent: string;
   budget: string;
   quantity: number;
+  compactMode: boolean;
+  avoidDuplicates: boolean;
 };
 
 
@@ -473,6 +479,8 @@ const defaultCommunitySettings: CommunitySettings = {
   intent: "Tự chọn",
   budget: "",
   quantity: 12,
+  compactMode: true,
+  avoidDuplicates: true,
 };
 
 const baseStyle = `Bạn là TikToker chuyên kể chuyện công nghệ cho Siêu Di Động, dùng giọng Adam trên ElevenLabs V3.
@@ -600,6 +608,12 @@ export default function Home() {
   const [communitySettings, setCommunitySettings] = useState<CommunitySettings>(defaultCommunitySettings);
   const [communityQuestions, setCommunityQuestions] = useState<CommunityQuestion[]>([]);
   const [communityLoading, setCommunityLoading] = useState(false);
+  const [communitySearch, setCommunitySearch] = useState("");
+  const [communityTagFilter, setCommunityTagFilter] = useState("Tất cả");
+  const [communityView, setCommunityView] = useState<"all" | "favorite" | "copied">("all");
+  const [communityFeedback, setCommunityFeedback] = useState("");
+  const [communityRefining, setCommunityRefining] = useState(false);
+  const [showCommunityLearning, setShowCommunityLearning] = useState(false);
   const [versionsHistory, setVersionsHistory] = useState<ScriptVersion[]>([]);
   const [rewriteStyle, setRewriteStyle] = useState("viral");
   const editorRef = useRef<HTMLDivElement>(null);
@@ -1032,35 +1046,88 @@ export default function Home() {
     } catch {}
   }
 
-  async function generateCommunityQuestions() {
+  function scoreCommunityQuestion(text: string) {
+    const lower = text.toLowerCase();
+    let score = 68;
+    if (text.length <= 95) score += 8;
+    if (text.length <= 55) score += 6;
+    if (/\b(ip|pr|prm|pl|bn|kh|ko|đc|g|v|tr)\b/i.test(lower)) score += 7;
+    if (!/[.!?]$/.test(text.trim())) score += 4;
+    if (!/^(mình|em|tôi|anh|chị|mọi người|các bác|anh em)\b/i.test(text.trim())) score += 5;
+    if (text.includes("\n")) score += 2;
+    return Math.max(45, Math.min(98, score));
+  }
+
+  function inferCommunityTags(text: string) {
+    const value = text.toLowerCase();
+    const tags: string[] = [];
+    if (/\b(ip|iphone|11|12|13|14|15|16|17|pr|prm|pl)\b/.test(value)) tags.push("iPhone");
+    if (/samsung/.test(value)) tags.push("Samsung");
+    if (/android|redmi|xiaomi|oppo|vivo|honor|oneplus/.test(value)) tags.push("Android");
+    if (/bù|lên đời|đổi máy|thu cũ/.test(value)) tags.push("Đổi máy");
+    if (/giá|bn|bao nhiêu|nhiêu/.test(value)) tags.push("Hỏi giá");
+    if (/pin|face|màn|mực|lỗi|hư/.test(value)) tags.push("Tình trạng máy");
+    if (/quy nhơn/.test(value)) tags.push("Quy Nhơn");
+    if (/tr|triệu|củ/.test(value)) tags.push("Ngân sách");
+    return tags.length ? tags.slice(0, 3) : ["Khác"];
+  }
+
+  async function generateCommunityQuestions(append = false) {
     setCommunityLoading(true);
     try {
+      const existingTexts = communityQuestions.map((item) => item.text);
       const data = await callAI("community", {
         communityExamples,
         communityCopiedExamples: communityCopiedExamples.slice(0, 80),
         communitySettings,
+        existingQuestions: communitySettings.avoidDuplicates ? existingTexts.slice(-120) : [],
       });
       const questions = Array.isArray(data.questions) ? data.questions : [];
-      setCommunityQuestions(
-        questions.map((text: string) => ({
+      const mapped = questions.map((text: string) => {
+        const clean = String(text).trim();
+        return {
           id: makeId(),
-          text: String(text).trim(),
+          text: clean,
           createdAt: today(),
           copied: false,
-        })).filter((item: CommunityQuestion) => item.text)
-      );
-      setStatus(`Đã tạo ${questions.length} câu hỏi cộng đồng.`);
+          favorite: false,
+          naturalScore: scoreCommunityQuestion(clean),
+          tags: inferCommunityTags(clean),
+          copyCount: 0,
+        } as CommunityQuestion;
+      }).filter((item: CommunityQuestion) => item.text);
+
+      setCommunityQuestions((items) => {
+        const base = append ? items : [];
+        const seen = new Set(base.map((item) => item.text.replace(/\s+/g, " ").trim().toLowerCase()));
+        const unique = mapped.filter((item: CommunityQuestion) => {
+          const key = item.text.replace(/\s+/g, " ").trim().toLowerCase();
+          if (seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+        return [...base, ...unique].slice(-250);
+      });
+      setStatus(append ? `Đã tạo thêm ${mapped.length} câu.` : `Đã tạo ${mapped.length} câu hỏi cộng đồng.`);
     } catch {
     } finally {
       setCommunityLoading(false);
     }
   }
 
+  function toggleCommunityFavorite(id: string) {
+    setCommunityQuestions((items) =>
+      items.map((item) => item.id === id ? { ...item, favorite: !item.favorite } : item)
+    );
+  }
+
   async function copyCommunityQuestion(item: CommunityQuestion) {
     await navigator.clipboard.writeText(item.text);
     setCommunityQuestions((items) =>
       items.map((question) =>
-        question.id === item.id ? { ...question, copied: true } : question
+        question.id === item.id
+          ? { ...question, copied: true, copyCount: (question.copyCount || 0) + 1 }
+          : question
       )
     );
     setCommunityCopiedExamples((items) => {
@@ -1071,6 +1138,84 @@ export default function Home() {
       return [item.text, ...items].slice(0, 200);
     });
     setStatus("Đã sao chép · Community AI ghi nhận đây là câu hỏi đạt.");
+  }
+
+  async function refineCommunityQuestions() {
+    if (!communityFeedback.trim() || communityQuestions.length === 0) {
+      setStatus("Nhập góp ý và phải có kết quả trước khi yêu cầu AI sửa.");
+      return;
+    }
+    setCommunityRefining(true);
+    try {
+      const data = await callAI("community_refine", {
+        feedback: communityFeedback,
+        questions: communityQuestions.map((item) => item.text),
+        communityExamples,
+        communityCopiedExamples: communityCopiedExamples.slice(0, 80),
+        communitySettings,
+      });
+      const questions = Array.isArray(data.questions) ? data.questions : [];
+      const mapped = questions.map((text: string) => {
+        const clean = String(text).trim();
+        return {
+          id: makeId(),
+          text: clean,
+          createdAt: today(),
+          copied: false,
+          favorite: false,
+          naturalScore: scoreCommunityQuestion(clean),
+          tags: inferCommunityTags(clean),
+          copyCount: 0,
+        } as CommunityQuestion;
+      }).filter((item: CommunityQuestion) => item.text);
+      if (mapped.length) {
+        setCommunityQuestions(mapped);
+        setCommunityFeedback("");
+        setStatus(`AI đã sửa lại ${mapped.length} câu theo góp ý.`);
+      }
+    } catch {
+    } finally {
+      setCommunityRefining(false);
+    }
+  }
+
+  function loadCommunitySampleText(text: string) {
+    const clean = text.replace(/\r\n/g, "\n").trim();
+    if (!clean) {
+      setStatus("File câu hỏi mẫu đang trống.");
+      return;
+    }
+    setCommunityExamples(clean);
+    setShowCommunityLearning(false);
+    const count = clean.split(/\n\s*\n/).filter(Boolean).length;
+    setStatus(`Đã nạp ${count} nhóm câu hỏi mẫu để AI học.`);
+  }
+
+  async function importCommunitySampleFile(file: File | null) {
+    if (!file) return;
+    try {
+      const text = await file.text();
+      if (file.name.toLowerCase().endsWith(".json")) {
+        try {
+          const parsed = JSON.parse(text);
+          if (Array.isArray(parsed)) {
+            loadCommunitySampleText(parsed.map((item) => typeof item === "string" ? item : item?.text || "").filter(Boolean).join("\n\n"));
+            return;
+          }
+          if (typeof parsed?.communityExamples === "string") {
+            loadCommunitySampleText(parsed.communityExamples);
+            return;
+          }
+          if (Array.isArray(parsed?.questions)) {
+            loadCommunitySampleText(parsed.questions.map((item: unknown) => String(item || "")).join("\n\n"));
+            return;
+          }
+        } catch {}
+      }
+      loadCommunitySampleText(text);
+    } catch {
+      setStatus("Không đọc được file câu hỏi mẫu.");
+    }
   }
 
   async function sendChat() {
@@ -1350,7 +1495,7 @@ export default function Home() {
           </div>
           <div className="brand-copy">
             <strong>CONTENT UNIVERSE</strong>
-            <small>Siêu Di Động · V23</small>
+            <small>Siêu Di Động · V25</small>
           </div>
           <button
             className="mobile-drawer-close"
@@ -1859,220 +2004,204 @@ export default function Home() {
             </div>
           )}
 
-          {page === "community" && (
-            <>
-              <div className="library-head community-head">
-                <div>
-                  <span className="eyebrow">COMMUNITY AI · V23</span>
-                  <h2>Tạo câu hỏi mua điện thoại tự nhiên.</h2>
-                  <p className="community-subtitle">
-                    Học cách nói từ câu mẫu của bạn. Ưu tiên iPhone, câu ngắn và có thể lược bỏ chủ ngữ.
-                  </p>
+          {page === "community" && (() => {
+            const allTags = Array.from(new Set(communityQuestions.flatMap((item) => item.tags || [])));
+            const filteredQuestions = communityQuestions.filter((item) => {
+              const searchOk = !communitySearch.trim() || item.text.toLowerCase().includes(communitySearch.toLowerCase());
+              const tagOk = communityTagFilter === "Tất cả" || (item.tags || []).includes(communityTagFilter);
+              const viewOk =
+                communityView === "all" ||
+                (communityView === "favorite" && item.favorite) ||
+                (communityView === "copied" && item.copied);
+              return searchOk && tagOk && viewOk;
+            });
+            const learnedWords = [...communityExamples.split(/\s+/), ...communityCopiedExamples.join(" ").split(/\s+/)]
+              .map((word) => word.toLowerCase().replace(/[.,!?():;"']/g, ""))
+              .filter((word) => word.length >= 2 && word.length <= 8);
+            const vocabMap = learnedWords.reduce<Record<string, number>>((acc, word) => {
+              acc[word] = (acc[word] || 0) + 1;
+              return acc;
+            }, {});
+            const topVocab = Object.entries(vocabMap).sort((a, b) => b[1] - a[1]).slice(0, 12);
+            const sampleCount = communityExamples.split(/\n\s*\n/).filter(Boolean).length;
+
+            return (
+              <>
+                <div className="community-v25-top">
+                  <div>
+                    <span className="eyebrow">COMMUNITY AI · V25</span>
+                    <h2>Câu hỏi cộng đồng.</h2>
+                    <p>Tạo → xem kết quả → góp ý → AI sửa lại ngay trên cùng một danh sách.</p>
+                  </div>
+                  <div className="community-top-actions">
+                    <button className="secondary" onClick={() => generateCommunityQuestions(true)} disabled={communityLoading}>＋ Sinh thêm</button>
+                    <button className="primary" onClick={() => generateCommunityQuestions(false)} disabled={communityLoading}>
+                      {communityLoading ? "Đang tạo..." : "✦ Tạo câu hỏi"}
+                    </button>
+                  </div>
                 </div>
-                <button
-                  className="primary"
-                  onClick={generateCommunityQuestions}
-                  disabled={communityLoading}
-                >
-                  {communityLoading ? "Đang tạo..." : "✦ Tạo câu hỏi"}
-                </button>
-              </div>
 
-              <div className="community-layout">
-                <section className="panel community-config">
-                  <div className="panel-head">
-                    <div>
-                      <span className="eyebrow">CÁCH AI HỌC</span>
-                      <h3>Câu hỏi mẫu</h3>
-                    </div>
-                    <span className="community-count">
-                      {communityExamples.split(/\n\s*\n/).filter(Boolean).length} mẫu
-                    </span>
-                  </div>
-                  <p className="community-help">
-                    Dán các câu hỏi thật bạn thích. Mỗi đoạn cách nhau bằng một dòng trống. AI học cách viết tắt,
-                    nhịp câu và cách hỏi — không sao chép nguyên văn.
-                  </p>
-                  <textarea
-                    className="community-examples"
-                    value={communityExamples}
-                    onChange={(event) => setCommunityExamples(event.target.value)}
-                    placeholder="tìm đth 2-3tr chữa cháy&#10;&#10;giá 15pl với 14prm g bnhieu v ạ"
-                  />
+                <div className="community-v25-layout">
+                  <aside className="community-v25-sidebar">
+                    <section className="panel v25-setup-card">
+                      <div className="v24-card-title">
+                        <div><span className="eyebrow">THIẾT LẬP NHANH</span><h3>Tạo câu hỏi</h3></div>
+                        <span className="community-count">{communitySettings.quantity} câu</span>
+                      </div>
 
-                  <div className="community-controls">
-                    <label>
-                      <span>Số câu tạo</span>
-                      <select
-                        value={communitySettings.quantity}
-                        onChange={(event) =>
-                          setCommunitySettings({...communitySettings, quantity: Number(event.target.value)})
-                        }
-                      >
-                        {[5, 10, 12, 20, 30, 50].map((value) => (
-                          <option key={value} value={value}>{value} câu</option>
+                      <div className="v24-form-grid">
+                        <label><span>Số lượng</span>
+                          <select value={communitySettings.quantity} onChange={(e) => setCommunitySettings({...communitySettings, quantity: Number(e.target.value)})}>
+                            {[5,10,12,20,30,50].map((value) => <option key={value} value={value}>{value} câu</option>)}
+                          </select>
+                        </label>
+                        <label><span>Dạng câu</span>
+                          <select value={communitySettings.intent} onChange={(e) => setCommunitySettings({...communitySettings, intent: e.target.value})}>
+                            {["Tự chọn","Hỏi giá","Tìm máy theo ngân sách","Đổi máy / bù thêm","Thu cũ đổi mới","Máy cũ / likenew","Hỏi pin / màn / Face ID","Mua gấp trong ngày","So sánh 2 máy","Mua số lượng"].map((value) => <option key={value}>{value}</option>)}
+                          </select>
+                        </label>
+                        <label><span>Ngân sách</span><input value={communitySettings.budget} onChange={(e) => setCommunitySettings({...communitySettings, budget:e.target.value})} placeholder="2-3tr, 8tr..." /></label>
+                        <label><span>Khu vực</span><input value={communitySettings.location} onChange={(e) => setCommunitySettings({...communitySettings, location:e.target.value})} placeholder="Quy Nhơn" /></label>
+                      </div>
+
+                      <div className="v24-range">
+                        <div><strong>Ưu tiên iPhone</strong><span>{communitySettings.iphoneWeight}%</span></div>
+                        <input type="range" min="0" max="100" step="5" value={communitySettings.iphoneWeight} onChange={(e) => setCommunitySettings({...communitySettings, iphoneWeight:Number(e.target.value)})} />
+                      </div>
+                      <div className="v24-range">
+                        <div><strong>Độ đời thường</strong><span>{communitySettings.naturalness}%</span></div>
+                        <input type="range" min="40" max="100" step="5" value={communitySettings.naturalness} onChange={(e) => setCommunitySettings({...communitySettings, naturalness:Number(e.target.value)})} />
+                      </div>
+
+                      <div className="v24-toggle-list">
+                        <label><input type="checkbox" checked={communitySettings.omitSubject} onChange={(e) => setCommunitySettings({...communitySettings, omitSubject:e.target.checked})} />
+                          <span><strong>Ưu tiên bỏ chủ ngữ</strong><small>“15pr giờ bn”, “cần máy 2-3tr”</small></span>
+                        </label>
+                        <label><input type="checkbox" checked={communitySettings.avoidDuplicates !== false} onChange={(e) => setCommunitySettings({...communitySettings, avoidDuplicates:e.target.checked})} />
+                          <span><strong>Tránh câu đã sinh</strong><small>Giảm lặp trong các lần tạo sau</small></span>
+                        </label>
+                      </div>
+                    </section>
+
+                    <section className="panel v25-learning-loader">
+                      <div className="v25-learning-head">
+                        <div>
+                          <span className="eyebrow">AI LEARNING</span>
+                          <h3>Dữ liệu câu hỏi mẫu</h3>
+                        </div>
+                        <span className={sampleCount ? "v25-ready" : "v25-empty-badge"}>{sampleCount ? `${sampleCount} mẫu` : "Chưa nạp"}</span>
+                      </div>
+                      <p>Không hiển thị ô mẫu thường trực. Chỉ nạp dữ liệu khi cần để AI học cách nói.</p>
+                      <div className="v25-loader-actions">
+                        <label className="secondary v25-file-button">
+                          ↑ Nạp file mẫu
+                          <input type="file" accept=".txt,.json,.md,.csv" onChange={(e) => importCommunitySampleFile(e.target.files?.[0] || null)} />
+                        </label>
+                        <button className="secondary" onClick={() => setShowCommunityLearning(!showCommunityLearning)}>
+                          {showCommunityLearning ? "Đóng" : "Dán mẫu"}
+                        </button>
+                      </div>
+                      {showCommunityLearning && (
+                        <div className="v25-paste-box">
+                          <textarea value={communityExamples} onChange={(e) => setCommunityExamples(e.target.value)} placeholder="Dán các câu hỏi mẫu vào đây, cách nhau bằng một dòng trống..." />
+                          <button className="primary" onClick={() => {
+                            setShowCommunityLearning(false);
+                            setStatus(`Đã lưu ${sampleCount} nhóm câu hỏi mẫu để AI học.`);
+                          }}>✓ Lưu dữ liệu học</button>
+                        </div>
+                      )}
+                      {sampleCount > 0 && (
+                        <div className="v25-learned-summary">
+                          <span>✓ AI đang sử dụng dữ liệu mẫu</span>
+                          <button onClick={() => { setCommunityExamples(""); setStatus("Đã xóa câu hỏi mẫu."); }}>Xóa mẫu</button>
+                        </div>
+                      )}
+                    </section>
+
+                    <details className="panel v24-learning-card">
+                      <summary><span><span className="eyebrow">VOCABULARY</span><strong>AI đang học từ</strong></span><span>{communityCopiedExamples.length} Copy</span></summary>
+                      <div className="v24-vocab">
+                        {topVocab.length ? topVocab.map(([word,count]) => <span key={word}>{word}<b>{count}</b></span>) : <small>Copy vài câu đạt để AI tự học thêm.</small>}
+                      </div>
+                    </details>
+                  </aside>
+
+                  <main className="community-v25-main">
+                    <section className="panel v25-feedback-card">
+                      <div className="v25-feedback-head">
+                        <div>
+                          <span className="eyebrow">GÓP Ý CHO AI</span>
+                          <h3>Sửa lại kết quả vừa tạo</h3>
+                        </div>
+                        <span>{communityQuestions.length ? `${communityQuestions.length} câu hiện tại` : "Chưa có kết quả"}</span>
+                      </div>
+                      <div className="v25-feedback-row">
+                        <textarea
+                          value={communityFeedback}
+                          onChange={(e) => setCommunityFeedback(e.target.value)}
+                          placeholder='Ví dụ: "ngắn hơn nữa, bớt viết tắt, ưu tiên hỏi giá iPhone 14-16, câu phải cụt và không chủ ngữ"'
+                        />
+                        <button className="primary" onClick={refineCommunityQuestions} disabled={communityRefining || !communityQuestions.length}>
+                          {communityRefining ? "AI đang sửa..." : "✦ Sửa theo góp ý"}
+                        </button>
+                      </div>
+                      <div className="v25-feedback-chips">
+                        {["ngắn hơn nữa","đời hơn, cụt hơn","bớt viết tắt","ưu tiên iPhone","thêm câu hỏi giá","không cần chủ ngữ","đa dạng hơn, đừng lặp form"].map((text) => (
+                          <button key={text} onClick={() => setCommunityFeedback((old) => old ? `${old}, ${text}` : text)}>{text}</button>
                         ))}
-                      </select>
-                    </label>
+                      </div>
+                    </section>
 
-                    <label>
-                      <span>Dạng câu hỏi</span>
-                      <select
-                        value={communitySettings.intent}
-                        onChange={(event) =>
-                          setCommunitySettings({...communitySettings, intent: event.target.value})
-                        }
-                      >
-                        {[
-                          "Tự chọn",
-                          "Hỏi giá",
-                          "Tìm máy theo ngân sách",
-                          "Đổi máy / bù thêm",
-                          "Thu cũ đổi mới",
-                          "Máy cũ / likenew",
-                          "Hỏi pin / màn / Face ID",
-                          "Mua gấp trong ngày",
-                          "So sánh 2 máy",
-                          "Mua số lượng",
-                        ].map((value) => <option key={value}>{value}</option>)}
-                      </select>
-                    </label>
+                    <section className="panel community-v25-results">
+                      <div className="v24-results-head">
+                        <div><span className="eyebrow">KẾT QUẢ</span><h3>{filteredQuestions.length} câu hỏi</h3></div>
+                        <button className="secondary" onClick={async () => {
+                          await navigator.clipboard.writeText(filteredQuestions.map((item) => item.text).join("\n\n"));
+                          setStatus("Đã sao chép toàn bộ câu đang hiển thị.");
+                        }}>Copy tất cả</button>
+                      </div>
 
-                    <label>
-                      <span>Ngân sách (không bắt buộc)</span>
-                      <input
-                        value={communitySettings.budget}
-                        onChange={(event) =>
-                          setCommunitySettings({...communitySettings, budget: event.target.value})
-                        }
-                        placeholder="vd 2-3tr, 8tr, 15tr..."
-                      />
-                    </label>
+                      <div className="v24-toolbar">
+                        <input className="v24-search" value={communitySearch} onChange={(e) => setCommunitySearch(e.target.value)} placeholder="Tìm trong câu đã tạo..." />
+                        <div className="v24-view-tabs">
+                          <button className={communityView==="all"?"active":""} onClick={() => setCommunityView("all")}>Tất cả</button>
+                          <button className={communityView==="favorite"?"active":""} onClick={() => setCommunityView("favorite")}>★ Đã thích</button>
+                          <button className={communityView==="copied"?"active":""} onClick={() => setCommunityView("copied")}>✓ Đã Copy</button>
+                        </div>
+                      </div>
 
-                    <label>
-                      <span>Khu vực</span>
-                      <input
-                        value={communitySettings.location}
-                        onChange={(event) =>
-                          setCommunitySettings({...communitySettings, location: event.target.value})
-                        }
-                        placeholder="Quy Nhơn"
-                      />
-                    </label>
-                  </div>
+                      <div className="v24-tags">
+                        {["Tất cả",...allTags].map((tag) => <button key={tag} className={communityTagFilter===tag?"active":""} onClick={() => setCommunityTagFilter(tag)}>{tag}</button>)}
+                      </div>
 
-                  <div className="community-slider">
-                    <div>
-                      <strong>Ưu tiên iPhone</strong>
-                      <span>{communitySettings.iphoneWeight}% iPhone · {100 - communitySettings.iphoneWeight}% Android</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      step="5"
-                      value={communitySettings.iphoneWeight}
-                      onChange={(event) =>
-                        setCommunitySettings({...communitySettings, iphoneWeight: Number(event.target.value)})
-                      }
-                    />
-                  </div>
+                      {filteredQuestions.length === 0 ? (
+                        <div className="community-empty"><b>Chưa có câu hỏi.</b><p>Bấm “Tạo câu hỏi” để bắt đầu.</p></div>
+                      ) : (
+                        <div className="v24-question-list">
+                          {filteredQuestions.map((item) => (
+                            <article className={`v24-question ${item.copied ? "copied" : ""}`} key={item.id}>
+                              <button className={`v24-star ${item.favorite ? "active" : ""}`} onClick={() => toggleCommunityFavorite(item.id)}>★</button>
+                              <div className="v24-question-body">
+                                <div className="v24-question-meta">
+                                  <span className={`v24-score ${item.naturalScore >= 88 ? "great" : item.naturalScore >= 76 ? "good" : ""}`}>{item.naturalScore}% tự nhiên</span>
+                                  {(item.tags || []).map((tag) => <span className="v24-tag" key={tag}>{tag}</span>)}
+                                  {item.copyCount > 0 && <span className="v24-copy-count">{item.copyCount}× copy</span>}
+                                </div>
+                                <p>{item.text}</p>
+                              </div>
+                              <button className={item.copied ? "success-btn":"secondary"} onClick={() => copyCommunityQuestion(item)}>{item.copied ? "✓ Đã Copy":"Copy"}</button>
+                            </article>
+                          ))}
+                        </div>
+                      )}
 
-                  <div className="community-slider">
-                    <div>
-                      <strong>Độ đời thường</strong>
-                      <span>{communitySettings.naturalness}%</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="40"
-                      max="100"
-                      step="5"
-                      value={communitySettings.naturalness}
-                      onChange={(event) =>
-                        setCommunitySettings({...communitySettings, naturalness: Number(event.target.value)})
-                      }
-                    />
-                  </div>
-
-                  <label className="community-toggle">
-                    <input
-                      type="checkbox"
-                      checked={communitySettings.omitSubject}
-                      onChange={(event) =>
-                        setCommunitySettings({...communitySettings, omitSubject: event.target.checked})
-                      }
-                    />
-                    <span>
-                      <strong>Ưu tiên câu không cần chủ ngữ</strong>
-                      <small>Ví dụ: “15pr giờ bn”, “cần máy 2-3tr chữa cháy”, “lên 14pro bù nhiêu”</small>
-                    </span>
-                  </label>
-
-                  <div className="community-learning-note">
-                    <strong>AI đang học từ {communityCopiedExamples.length} câu bạn đã Copy</strong>
-                    <p>Câu nào được Copy sẽ có trọng số cao hơn trong những lần tạo sau.</p>
-                    {communityCopiedExamples.length > 0 && (
-                      <button className="secondary" onClick={() => setCommunityCopiedExamples([])}>
-                        Xóa dữ liệu học từ Copy
-                      </button>
-                    )}
-                  </div>
-                </section>
-
-                <section className="panel community-results">
-                  <div className="panel-head">
-                    <div>
-                      <span className="eyebrow">KẾT QUẢ</span>
-                      <h3>Câu hỏi đề xuất</h3>
-                    </div>
-                    {communityQuestions.length > 0 && (
-                      <button
-                        className="secondary"
-                        onClick={async () => {
-                          await navigator.clipboard.writeText(
-                            communityQuestions.map((item) => item.text).join("\n\n")
-                          );
-                          setStatus("Đã sao chép toàn bộ câu hỏi.");
-                        }}
-                      >
-                        Copy tất cả
-                      </button>
-                    )}
-                  </div>
-
-                  {communityQuestions.length === 0 ? (
-                    <div className="community-empty">
-                      <b>Chưa có câu hỏi.</b>
-                      <p>Chỉnh mẫu và thông số bên trái rồi bấm “Tạo câu hỏi”.</p>
-                    </div>
-                  ) : (
-                    <div className="community-question-list">
-                      {communityQuestions.map((item, index) => (
-                        <article className={`community-question ${item.copied ? "copied" : ""}`} key={item.id}>
-                          <div>
-                            <span className="question-number">{String(index + 1).padStart(2, "0")}</span>
-                            <p>{item.text}</p>
-                          </div>
-                          <button className="secondary" onClick={() => copyCommunityQuestion(item)}>
-                            {item.copied ? "✓ Đã Copy" : "Copy"}
-                          </button>
-                        </article>
-                      ))}
-                    </div>
-                  )}
-
-                  <div className="community-disclosure">
-                    <strong>Lưu ý sử dụng</strong>
-                    <p>
-                      Module này tạo bản nháp câu hỏi cộng đồng để nghiên cứu nhu cầu và soạn nội dung thảo luận.
-                      Không dùng để giả danh trải nghiệm, đánh giá hoặc danh tính của người dùng thật.
-                    </p>
-                  </div>
-                </section>
-              </div>
-            </>
-          )}
+                      <div className="v24-bottom-actions"><button className="secondary" onClick={() => generateCommunityQuestions(true)} disabled={communityLoading}>＋ Sinh thêm {communitySettings.quantity} câu</button></div>
+                    </section>
+                  </main>
+                </div>
+              </>
+            );
+          })()}
 
           {page === "hooks" && (
             <>
