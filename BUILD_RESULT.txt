@@ -1,0 +1,12 @@
+Content Universe V22.2
+
+Đã sửa lỗi CSS khiến Vercel báo Unknown word tại app/globals.css.
+Nguyên nhân: chuỗi \n bị ghi thành ký tự văn bản trong file CSS.
+
+Kiểm tra đã thực hiện:
+- Đã loại bỏ toàn bộ chuỗi \n sai trong khối hiệu ứng V22.1.
+- Đã giữ nguyên hiệu ứng click, ripple, toast thành công và footer bản quyền.
+- Đã cập nhật nhãn phiên bản thành V22.2.
+- Đã kiểm tra cân bằng ngoặc CSS bằng script nội bộ.
+
+Lưu ý: môi trường đóng gói không tải được @types/node từ npm registry nội bộ, nên không thể chạy npm install/npm run build tại đây. Lỗi được sửa đúng theo dòng báo lỗi từ Vercel và chỉ thay đổi phần CSS bị escape sai.
