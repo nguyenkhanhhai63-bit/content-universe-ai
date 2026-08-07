@@ -1,6 +1,6 @@
 {
-  "name": "content-universe-v29-community-ux",
-  "version": "29.0.0",
+  "name": "content-universe-v29-1-community-large",
+  "version": "29.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev",

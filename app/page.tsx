@@ -1720,7 +1720,7 @@ export default function Home() {
           </div>
           <div className="brand-copy">
             <strong>CONTENT UNIVERSE</strong>
-            <small>Siêu Di Động · V29</small>
+            <small>Siêu Di Động · V29.1</small>
           </div>
           <button
             className="mobile-drawer-close"
@@ -2119,7 +2119,7 @@ export default function Home() {
                   <section className="studio-feedback-card">
                     <div className="studio-feedback-head">
                       <div>
-                        <span className="eyebrow">AI FEEDBACK · V29</span>
+                        <span className="eyebrow">AI FEEDBACK · V29.1</span>
                         <h3>Sửa kết quả theo góp ý</h3>
                         <p>Không ưng kết quả? Góp ý ngay tại đây để AI sửa lại, không cần tạo bài mới.</p>
                       </div>
@@ -2240,7 +2240,7 @@ export default function Home() {
             <div className="trainer-v27">
               <section className="trainer-hero-v27">
                 <div>
-                  <span className="eyebrow">AI TRAINER · V29</span>
+                  <span className="eyebrow">AI TRAINER · V29.1</span>
                   <h2>Dạy AI viết đúng gu của bạn.</h2>
                   <p>Dán những bài bạn thấy hay. AI rút ra quy tắc, Style DNA và đưa mẫu tốt vào bộ nhớ dùng cho AI Studio.</p>
                 </div>
@@ -2323,7 +2323,7 @@ export default function Home() {
               <section className="panel inspector-input-v27">
                 <div className="v27-section-head">
                   <div>
-                    <span className="eyebrow">AI INSPECTOR · V29</span>
+                    <span className="eyebrow">AI INSPECTOR · V29.1</span>
                     <h2>Kiểm định trước khi đăng.</h2>
                     <p>Dán kịch bản hoặc lấy thẳng bài đang viết trong AI Studio.</p>
                   </div>
@@ -2420,7 +2420,7 @@ export default function Home() {
               <div className="community-v29">
                 <div className="community-v29-header">
                   <div>
-                    <span className="eyebrow">COMMUNITY AI · V29</span>
+                    <span className="eyebrow">COMMUNITY AI · V29.1</span>
                     <h2>Câu hỏi cộng đồng</h2>
                     <p>Tạo nhanh, góp ý, lọc và Copy trong một màn hình.</p>
                   </div>
