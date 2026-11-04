@@ -38,7 +38,7 @@ async function runGemini(
         systemInstruction: { parts: [{ text: systemInstruction }] },
         contents: [{ role: "user", parts: [{ text: prompt }] }],
         generationConfig: {
-          temperature: jsonMode ? 0.4 : 0.92,
+          temperature: jsonMode ? 0.95 : 0.92,
           topP: 0.95,
           maxOutputTokens: 8000,
           ...(jsonMode ? { responseMimeType: "application/json" } : {}),
@@ -102,7 +102,9 @@ export async function POST(request: Request) {
     const communityExamples = String(body?.communityExamples || "");
     const communityCopiedExamples = Array.isArray(body?.communityCopiedExamples) ? body.communityCopiedExamples.slice(0, 80) : [];
     const communitySettings = body?.communitySettings || {};
-    const existingQuestions = Array.isArray(body?.existingQuestions) ? body.existingQuestions.slice(0, 120) : [];
+    const existingQuestions = Array.isArray(body?.existingQuestions) ? body.existingQuestions.slice(-180) : [];
+    const generationRound = Number(body?.generationRound) || 0;
+    const variationSeed = String(body?.variationSeed || "");
     const communityFeedback = String(body?.feedback || "");
     const communityQuestionsInput = Array.isArray(body?.questions) ? body.questions.slice(0, 80) : [];
     const studioOriginal = String(body?.original || "");
@@ -276,6 +278,8 @@ QUY TẮC QUAN TRỌNG:
 - Không dùng văn quảng cáo, không tự khen Siêu Di Động, không chèn tên cửa hàng trừ khi câu hỏi có nhu cầu địa phương hợp lý.
 - Không lặp y hệt câu mẫu. Học nhịp câu và từ vựng, rồi tạo câu mới.
 - Tránh lặp hoặc tạo câu quá giống danh sách câu đã sinh gần đây.
+
+ĐỢT SINH: ${generationRound + 1}; mã biến thể: ${variationSeed}. Mỗi đợt phải đổi tổ hợp model, nhu cầu, ngân sách, tình huống và cách diễn đạt. Không dùng lại câu đã xuất hiện dù người dùng bấm Tạo câu hỏi thay vì Sinh thêm.
 
 CÂU ĐÃ SINH GẦN ĐÂY:
 ${existingQuestions.length ? existingQuestions.map((item: string) => `- ${item}`).join("\n") : "(chưa có)"}

@@ -1189,44 +1189,53 @@ export default function Home() {
     return tags.length ? tags.slice(0, 3) : ["Khác"];
   }
 
+  function communityQuestionKey(value: string) {
+    return value.toLowerCase().normalize("NFC").replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
+  }
+
   async function generateCommunityQuestions(append = false) {
+    if (communityLoading) return;
     setCommunityLoading(true);
     try {
-      const existingTexts = communityQuestions.map((item) => item.text);
-      const data = await callAI("community", {
-        communityExamples,
-        communityCopiedExamples: communityCopiedExamples.slice(0, 80),
-        communitySettings,
-        existingQuestions: communitySettings.avoidDuplicates ? existingTexts.slice(-120) : [],
-      });
-      const questions = Array.isArray(data.questions) ? data.questions : [];
-      const mapped = questions.map((text: string) => {
-        const clean = String(text).trim();
-        return {
-          id: makeId(),
-          text: clean,
-          createdAt: today(),
-          copied: false,
-          favorite: false,
-          naturalScore: scoreCommunityQuestion(clean),
-          tags: inferCommunityTags(clean),
-          copyCount: 0,
-        } as CommunityQuestion;
-      }).filter((item: CommunityQuestion) => item.text);
-
-      setCommunityQuestions((items) => {
-        const base = append ? items : [];
-        const seen = new Set(base.map((item) => item.text.replace(/\s+/g, " ").trim().toLowerCase()));
-        const unique = mapped.filter((item: CommunityQuestion) => {
-          const key = item.text.replace(/\s+/g, " ").trim().toLowerCase();
-          if (seen.has(key)) return false;
-          seen.add(key);
-          return true;
+      const requested = Math.max(1, Number(communitySettings.quantity) || 5);
+      const previous = communityQuestions.map((item) => item.text);
+      const accepted: string[] = [];
+      const seen = new Set(previous.map(communityQuestionKey));
+      // Retry when the model returns duplicates or fewer questions than requested.
+      for (let attempt = 0; attempt < 4 && accepted.length < requested; attempt++) {
+        const data = await callAI("community", {
+          communityExamples,
+          communityCopiedExamples: communityCopiedExamples.slice(0, 80),
+          communitySettings: { ...communitySettings, quantity: requested - accepted.length },
+          existingQuestions: [...previous, ...accepted].slice(-180),
+          generationRound: attempt,
+          variationSeed: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         });
-        return [...base, ...unique].slice(-250);
-      });
-      setStatus(append ? `Đã tạo thêm ${mapped.length} câu.` : `Đã tạo ${mapped.length} câu hỏi cộng đồng.`);
-    } catch {
+        const generated = Array.isArray(data.questions) ? data.questions : [];
+        for (const candidate of generated) {
+          const clean = String(candidate || "").trim();
+          const key = communityQuestionKey(clean);
+          if (!key || seen.has(key)) continue;
+          seen.add(key);
+          accepted.push(clean);
+          if (accepted.length >= requested) break;
+        }
+      }
+      if (!accepted.length) {
+        throw new Error("AI chưa tạo được câu hỏi mới. Hãy thử lại hoặc thay đổi thiết lập.");
+      }
+      const mapped = accepted.map((clean) => ({
+        id: makeId(), text: clean, createdAt: today(), copied: false,
+        favorite: false, naturalScore: scoreCommunityQuestion(clean),
+        tags: inferCommunityTags(clean), copyCount: 0,
+      } as CommunityQuestion));
+      setCommunityQuestions((items) => [...(append ? items : []), ...mapped].slice(-250));
+      setCommunityTagFilter("Tất cả");
+      setCommunityView("all");
+      setCommunitySearch("");
+      setStatus(`Đã tạo ${mapped.length}/${requested} câu mới, không trùng câu đã tạo.`);
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Không thể tạo câu hỏi mới.");
     } finally {
       setCommunityLoading(false);
     }
