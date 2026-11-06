@@ -1180,7 +1180,7 @@ export default function Home() {
   function inferCommunityTags(text: string) {
     const value = text.toLowerCase();
     const tags: string[] = [];
-    if (/\b(ip|iphone|11|12|13|14|15|16|17|pr|prm|pl)\b/.test(value)) tags.push("iPhone");
+    if (isIphoneCommunityQuestion(text)) tags.push("iPhone");
     if (/samsung/.test(value)) tags.push("Samsung");
     if (/android|redmi|xiaomi|oppo|vivo|honor|oneplus/.test(value)) tags.push("Android");
     if (/bù|lên đời|đổi máy|thu cũ/.test(value)) tags.push("Đổi máy");
@@ -1211,6 +1211,11 @@ export default function Home() {
     }
   }
 
+  function isIphoneCommunityQuestion(question: string) {
+    const q = question.toLowerCase().normalize("NFC");
+    return /\biphone\b|\bipad\b|\bapple\b|\bios\b|\bface\s*id\b|\bip\s*\d{1,2}\s*(?:pro\s*max|pro|prm|pr|plus|pl)?\b|\b(?:11|12|13|14|15|16|17)\s*(?:pro\s*max|pro|prm|pr|plus|pl)\b|\b(?:ip|iphone)\s*(?:pro|prm|plus)\b/i.test(q);
+  }
+
   function matchesCommunityLength(question: string, length: string) {
     const words = question.trim().split(/\s+/).filter(Boolean).length;
     if (length === "Ngắn") return words >= 3 && words <= 12;
@@ -1227,12 +1232,21 @@ export default function Home() {
       const previous = communityQuestions.map((item) => item.text);
       const accepted: string[] = [];
       const seen = new Set(previous.map(communityQuestionKey));
-      // Retry when the model returns duplicates or fewer questions than requested.
-      for (let attempt = 0; attempt < 4 && accepted.length < requested; attempt++) {
+      // Enforce the slider as a per-batch quota, not a loose model suggestion.
+      // For odd batch sizes, round to the nearest whole question.
+      const targetIphone = Math.round(requested * Math.max(0, Math.min(100, Number(communitySettings.iphoneWeight))) / 100);
+      let iphoneCount = 0;
+      let androidCount = 0;
+      for (let attempt = 0; attempt < 7 && accepted.length < requested; attempt++) {
+        const iphoneMissing = targetIphone - iphoneCount;
+        const androidMissing = (requested - targetIphone) - androidCount;
+        const wantIphone = iphoneMissing > 0 && (androidMissing <= 0 || attempt % 2 === 0);
+        const remainingCategory = wantIphone ? iphoneMissing : androidMissing;
+        if (remainingCategory <= 0) continue;
         const data = await callAI("community", {
           communityExamples,
           communityCopiedExamples: communityCopiedExamples.slice(0, 80),
-          communitySettings: { ...communitySettings, quantity: requested - accepted.length },
+          communitySettings: { ...communitySettings, quantity: remainingCategory, iphoneWeight: wantIphone ? 100 : 0 },
           existingQuestions: [...previous, ...accepted].slice(-180),
           generationRound: attempt,
           variationSeed: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -1241,14 +1255,20 @@ export default function Home() {
         for (const candidate of generated) {
           const clean = String(candidate || "").trim();
           const key = communityQuestionKey(clean);
-          if (!key || seen.has(key) || !matchesCommunityIntent(clean, communitySettings.intent) || !matchesCommunityLength(clean, communitySettings.length || "Tự nhiên")) continue;
+          const iphone = isIphoneCommunityQuestion(clean);
+          if (!key || seen.has(key) || iphone !== wantIphone ||
+              !matchesCommunityIntent(clean, communitySettings.intent) ||
+              !matchesCommunityLength(clean, communitySettings.length || "Tự nhiên")) continue;
+          if (iphone && iphoneCount >= targetIphone) continue;
+          if (!iphone && androidCount >= requested - targetIphone) continue;
           seen.add(key);
           accepted.push(clean);
-          if (accepted.length >= requested) break;
+          if (iphone) iphoneCount++; else androidCount++;
+          if (accepted.length >= requested || (wantIphone ? iphoneCount >= targetIphone : androidCount >= requested - targetIphone)) break;
         }
       }
-      if (!accepted.length) {
-        throw new Error("AI chưa tạo được câu hỏi mới. Hãy thử lại hoặc thay đổi thiết lập.");
+      if (accepted.length !== requested) {
+        throw new Error(`AI mới tạo được ${accepted.length}/${requested} câu đúng bộ lọc (iPhone ${iphoneCount}/${targetIphone}). Chưa thay đổi danh sách; hãy thử lại.`);
       }
       const mapped = accepted.map((clean) => ({
         id: makeId(), text: clean, createdAt: today(), copied: false,

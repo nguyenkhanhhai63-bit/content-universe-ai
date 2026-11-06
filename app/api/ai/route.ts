@@ -240,7 +240,7 @@ YÊU CẦU:
     } else if (mode === "community") {
       jsonMode = true;
       const quantity = Math.max(1, Math.min(50, Number(communitySettings?.quantity) || 12));
-      const iphoneWeight = Math.max(0, Math.min(100, Number(communitySettings?.iphoneWeight) || 70));
+      const iphoneWeight = Math.max(0, Math.min(100, Number(communitySettings?.iphoneWeight ?? 70)));
       const naturalness = Math.max(40, Math.min(100, Number(communitySettings?.naturalness) || 90));
       const omitSubject = communitySettings?.omitSubject !== false;
       const communityLocation = String(communitySettings?.location || "Quy Nhơn").trim();
@@ -287,7 +287,7 @@ THIẾT LẬP:
 - Ngân sách tham khảo: ${communityBudget || "tự chọn đa dạng"}.
 
 QUY TẮC QUAN TRỌNG:
-- iPhone là chủ đề chính nếu tỷ lệ iPhone cao. Có thể dùng cách gọi như ip11, 13pr, 14prm, 15pl, 15pr, 16 thường... khi phù hợp.
+- Nếu tỷ lệ iPhone = 0%, KHÔNG nhắc đến iPhone, ip11/ip12/ip13, các tên viết tắt 13pr/14prm/15pl, Apple hay Face ID; mọi câu chỉ về Android. Nếu tỷ lệ = 100%, TẤT CẢ câu phải nhắc rõ iPhone hoặc tên model iPhone. Với tỷ lệ khác, tuân thủ tỷ lệ được yêu cầu.
 - Android vẫn phải đa dạng Samsung, Xiaomi, Redmi, Oppo, OnePlus, vivo, Honor... nhưng không bịa model chưa được nhắc nếu không cần thiết.
 - Chỉ ưu tiên ví dụ ngắn khi thiết lập Độ dài là Ngắn hoặc Tự nhiên, không áp dụng cho Vừa/Dài. Ví dụ: "15pr giờ bn", "tìm đth 2-3tr chữa cháy", "lên 14pro 256 bù nhiêu ạ".
 - Không viết câu nào cũng đầy đủ ngữ pháp. Có thể thiếu chủ ngữ, thiếu dấu chấm, viết tắt, dùng "kh", "ko", "đc", "bn", "g", "v", "ạ", "pr", "prm", "pl" với tần suất tự nhiên.
