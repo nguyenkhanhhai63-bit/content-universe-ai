@@ -124,6 +124,7 @@ type CommunitySettings = {
   omitSubject: boolean;
   location: string;
   intent: string;
+  length: "Tự nhiên" | "Ngắn" | "Vừa" | "Dài";
   budget: string;
   quantity: number;
   compactMode: boolean;
@@ -505,6 +506,7 @@ const defaultCommunitySettings: CommunitySettings = {
   omitSubject: true,
   location: "Quy Nhơn",
   intent: "Tự chọn",
+  length: "Tự nhiên",
   budget: "",
   quantity: 12,
   compactMode: true,
@@ -1193,6 +1195,30 @@ export default function Home() {
     return value.toLowerCase().normalize("NFC").replace(/[^\p{L}\p{N}]+/gu, " ").trim().replace(/\s+/g, " ");
   }
 
+  function matchesCommunityIntent(question: string, intent: string) {
+    const q = question.toLowerCase();
+    switch (intent) {
+      case "Đổi máy / bù thêm": return /bù|đổi|lên đời|nâng cấp|thu lại|thu cũ|trade.?in/.test(q);
+      case "Thu cũ đổi mới": return /thu cũ|thu lại|thu đổi|đổi máy|đổi lên|đổi sang|bù/.test(q);
+      case "Hỏi giá": return /giá|bao nhiêu|bn|nhiêu|mấy tiền|mấy củ|mấy tr|nhiu/.test(q);
+      case "Tìm máy theo ngân sách": return /\d+\s*(tr|triệu|củ|k|đ)|ngân sách|tài chính|tầm tiền|budget/.test(q);
+      case "Máy cũ / likenew": return /cũ|likenew|like new|99%|98%|đã qua sử dụng|secondhand/.test(q);
+      case "Hỏi pin / màn / Face ID": return /pin|màn|face.?id|mực|sọc|chai|thay linh kiện/.test(q);
+      case "Mua gấp trong ngày": return /hôm nay|trong ngày|gấp|ngay|chiều nay|tối nay|liền/.test(q);
+      case "So sánh 2 máy": return /hay|vs|với|so sánh|chọn con nào|con nào hơn/.test(q);
+      case "Mua số lượng": return /số lượng|sỉ|nhiều máy|\d+\s*(máy|chiếc|cái)|combo|mua chung/.test(q);
+      default: return true;
+    }
+  }
+
+  function matchesCommunityLength(question: string, length: string) {
+    const words = question.trim().split(/\s+/).filter(Boolean).length;
+    if (length === "Ngắn") return words >= 3 && words <= 12;
+    if (length === "Vừa") return words >= 13 && words <= 28;
+    if (length === "Dài") return words >= 29 && words <= 65;
+    return true;
+  }
+
   async function generateCommunityQuestions(append = false) {
     if (communityLoading) return;
     setCommunityLoading(true);
@@ -1215,7 +1241,7 @@ export default function Home() {
         for (const candidate of generated) {
           const clean = String(candidate || "").trim();
           const key = communityQuestionKey(clean);
-          if (!key || seen.has(key)) continue;
+          if (!key || seen.has(key) || !matchesCommunityIntent(clean, communitySettings.intent) || !matchesCommunityLength(clean, communitySettings.length || "Tự nhiên")) continue;
           seen.add(key);
           accepted.push(clean);
           if (accepted.length >= requested) break;
@@ -2460,6 +2486,12 @@ export default function Home() {
                             <span>Dạng câu</span>
                             <select value={communitySettings.intent} onChange={(e) => setCommunitySettings({...communitySettings, intent:e.target.value})}>
                               {["Tự chọn","Hỏi giá","Tìm máy theo ngân sách","Đổi máy / bù thêm","Thu cũ đổi mới","Máy cũ / likenew","Hỏi pin / màn / Face ID","Mua gấp trong ngày","So sánh 2 máy","Mua số lượng"].map((value) => <option key={value}>{value}</option>)}
+                            </select>
+                          </label>
+                          <label>
+                            <span>Độ dài câu</span>
+                            <select value={communitySettings.length || "Tự nhiên"} onChange={(e) => setCommunitySettings({...communitySettings, length:e.target.value as CommunitySettings["length"]})}>
+                              {["Tự nhiên", "Ngắn", "Vừa", "Dài"].map((value) => <option key={value} value={value}>{value === "Ngắn" ? "Ngắn (3–12 từ)" : value === "Vừa" ? "Vừa (13–28 từ)" : value === "Dài" ? "Dài (29–65 từ)" : "Tự nhiên (trộn độ dài)"}</option>)}
                             </select>
                           </label>
                           <label>

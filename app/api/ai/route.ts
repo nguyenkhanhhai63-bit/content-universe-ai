@@ -246,7 +246,26 @@ YÊU CẦU:
       const communityLocation = String(communitySettings?.location || "Quy Nhơn").trim();
       const communityIntent = String(communitySettings?.intent || "Tự chọn").trim();
       const communityBudget = String(communitySettings?.budget || "").trim();
+      const communityLength = String(communitySettings?.length || "Tự nhiên");
+      const lengthRules: Record<string, string> = {
+        "Ngắn": "MỖI câu phải có từ 3 đến 12 từ, súc tích, có thể viết tắt.",
+        "Vừa": "MỖI câu phải có từ 13 đến 28 từ, đủ ngữ cảnh nhưng vẫn đời thường.",
+        "Dài": "MỖI câu phải có từ 29 đến 65 từ, có tình huống, nhu cầu cụ thể và câu hỏi tự nhiên; không lan man.",
+        "Tự nhiên": "Trộn câu ngắn 3–12 từ, câu vừa 13–28 từ và câu dài 29–65 từ, thay đổi linh hoạt.",
+      };
 
+      const intentRules: Record<string, string> = {
+        "Hỏi giá": "TẤT CẢ câu phải hỏi giá mua hoặc giá bán của một mẫu điện thoại cụ thể.",
+        "Tìm máy theo ngân sách": "TẤT CẢ câu phải nêu ngân sách và hỏi tìm máy phù hợp.",
+        "Đổi máy / bù thêm": "TẤT CẢ câu phải nói rõ máy đang có, máy muốn lên đời và hỏi bù bao nhiêu hoặc đổi như thế nào. Không tạo câu chỉ hỏi mua máy.",
+        "Thu cũ đổi mới": "TẤT CẢ câu phải hỏi về thu lại máy cũ để đổi sang máy khác, giá thu hoặc thủ tục thu đổi.",
+        "Máy cũ / likenew": "TẤT CẢ câu phải hỏi về mua máy đã qua sử dụng, likenew, tình trạng hoặc bảo hành máy cũ.",
+        "Hỏi pin / màn / Face ID": "TẤT CẢ câu phải hỏi về pin, màn hình, Face ID hoặc tình trạng linh kiện máy.",
+        "Mua gấp trong ngày": "TẤT CẢ câu phải thể hiện nhu cầu mua hoặc nhận máy gấp trong hôm nay.",
+        "So sánh 2 máy": "TẤT CẢ câu phải so sánh ít nhất hai mẫu máy và hỏi nên chọn máy nào.",
+        "Mua số lượng": "TẤT CẢ câu phải hỏi mua nhiều máy cùng lúc, giá sỉ hoặc ưu đãi theo số lượng.",
+      };
+      const mandatoryIntent = intentRules[communityIntent] || "Tự do phối hợp các dạng câu hỏi khác nhau.";
       prompt = `Tạo đúng ${quantity} CÂU HỎI / NHU CẦU MUA ĐIỆN THOẠI dạng cộng đồng.
 
 Mục tiêu: tạo bản nháp câu hỏi tự nhiên để nghiên cứu nhu cầu và soạn nội dung thảo luận.
@@ -261,19 +280,20 @@ ${communityCopiedExamples.length ? communityCopiedExamples.map((item: string, in
 THIẾT LẬP:
 - Tỷ lệ chủ đề: khoảng ${iphoneWeight}% iPhone, ${100 - iphoneWeight}% Android.
 - Độ đời thường: ${naturalness}/100.
+- ĐỘ DÀI ĐÃ CHỌN: ${communityLength}. QUY TẮC BẮT BUỘC: ${lengthRules[communityLength] || lengthRules["Tự nhiên"]}
 - ${omitSubject ? "Ưu tiên mạnh câu lược bỏ chủ ngữ." : "Có thể dùng hoặc không dùng chủ ngữ."}
 - Khu vực tham khảo: ${communityLocation || "không bắt buộc"}.
-- Dạng câu hỏi: ${communityIntent}.
+- Dạng câu hỏi ĐÃ CHỌN: ${communityIntent}.\n- RÀNG BUỘC BẮT BUỘC: ${mandatoryIntent}\n- Nếu đã chọn một dạng cụ thể (không phải Tự chọn), TUYỆT ĐỐI không sinh câu thuộc dạng khác. Mỗi câu đều phải thể hiện rõ dạng đã chọn.
 - Ngân sách tham khảo: ${communityBudget || "tự chọn đa dạng"}.
 
 QUY TẮC QUAN TRỌNG:
 - iPhone là chủ đề chính nếu tỷ lệ iPhone cao. Có thể dùng cách gọi như ip11, 13pr, 14prm, 15pl, 15pr, 16 thường... khi phù hợp.
 - Android vẫn phải đa dạng Samsung, Xiaomi, Redmi, Oppo, OnePlus, vivo, Honor... nhưng không bịa model chưa được nhắc nếu không cần thiết.
-- Ưu tiên những câu rất ngắn như: "15pr giờ bn", "tìm đth 2-3tr chữa cháy", "lên 14pro 256 bù nhiêu ạ".
+- Chỉ ưu tiên ví dụ ngắn khi thiết lập Độ dài là Ngắn hoặc Tự nhiên, không áp dụng cho Vừa/Dài. Ví dụ: "15pr giờ bn", "tìm đth 2-3tr chữa cháy", "lên 14pro 256 bù nhiêu ạ".
 - Không viết câu nào cũng đầy đủ ngữ pháp. Có thể thiếu chủ ngữ, thiếu dấu chấm, viết tắt, dùng "kh", "ko", "đc", "bn", "g", "v", "ạ", "pr", "prm", "pl" với tần suất tự nhiên.
 - Không cố tình làm sai chính tả mọi câu. Phải có độ hỗn hợp như người thật trong group.
-- Có câu 1 dòng, có câu 2-3 dòng, có câu chỉ 4-8 từ.
-- Có thể hỏi giá, máy chữa cháy, mua cho người lớn, đổi máy bù tiền, máy lỗi màn/pin/Face ID, mua gấp trong ngày, mua số lượng, so sánh 2 máy.
+- Độ dài mỗi câu phải đúng thiết lập Độ dài đã chọn; chỉ trộn độ dài khi chọn Tự nhiên.
+- Chỉ phối hợp nhiều loại nhu cầu khi Dạng câu hỏi là Tự chọn. Với dạng cụ thể, giữ đúng chủ đề bắt buộc cho 100% câu.
 - Không nhồi "mọi người ơi", "các bác ơi", "anh em ơi" vào tất cả câu.
 - Không dùng văn quảng cáo, không tự khen Siêu Di Động, không chèn tên cửa hàng trừ khi câu hỏi có nhu cầu địa phương hợp lý.
 - Không lặp y hệt câu mẫu. Học nhịp câu và từ vựng, rồi tạo câu mới.
